@@ -1,0 +1,509 @@
+const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { query } = require('../config/database');
+const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
+const { sendEmail, sendPasswordResetEmail } = require('../services/emailService');
+
+// Get all users (for role switcher & book on behalf of)
+router.get('/users', async (req, res) => {
+  try {
+    const users = await query('SELECT id, name, email, password, role, department, no_show_count, penalty_suspended_until FROM users ORDER BY id ASC');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Login endpoint (Strict credential validation based on registered database users)
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Email address or username is required.' });
+    }
+
+    if (!password || !password.trim()) {
+      return res.status(400).json({ error: 'Password is required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 1. Query registered user strictly from database by email or name
+    const users = await query('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?', [cleanEmail, cleanEmail]);
+
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'Access denied: User is not registered in the system by Admin.' });
+    }
+
+    const user = users[0];
+
+    // 2. Strict Password Verification
+    const dbPassword = String(user.password || '').trim();
+    const inputPassword = String(password || '').trim();
+
+    if (!dbPassword) {
+      return res.status(401).json({ error: 'No password set for this registered account. Please contact Administrator.' });
+    }
+
+    if (inputPassword !== dbPassword) {
+      return res.status(401).json({ error: 'Invalid password. Access denied.' });
+    }
+
+    // 3. Issue Token for Authenticated User
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, department: user.department, name: user.name },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        no_show_count: user.no_show_count,
+        penalty_suspended_until: user.penalty_suspended_until
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Register endpoint (public self-registration — kept for backward compat)
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, role, department } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    // Check if email already exists
+    const existing = await query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    const userRole = role || 'staff';
+    const userDept = department || 'IT Department';
+
+    const result = await query(
+      'INSERT INTO users (name, email, role, department) VALUES (?, ?, ?, ?)',
+      [name, email, userRole, userDept]
+    );
+
+    const userId = result.insertId;
+    const token = jwt.sign(
+      { id: userId, email, role: userRole, department: userDept, name },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      message: 'User registered successfully!',
+      token,
+      user: {
+        id: userId,
+        name,
+        email,
+        role: userRole,
+        department: userDept,
+        no_show_count: 0,
+        penalty_suspended_until: null
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Super Admin: Register any actor without replacing current session
+router.post('/admin-register', authenticateToken, async (req, res) => {
+  try {
+    // Only super_admin may use this endpoint
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Access denied: only Super Admin can register users' });
+    }
+
+    const { name, email, role, department, password } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Only valid Google/Gmail accounts (@gmail.com) are accepted.' });
+    }
+
+    if (!password || !password.trim()) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const pwd = String(password).trim();
+    const missing = [];
+    if (pwd.length < 8) missing.push('at least 8 characters');
+    if (!/[a-zA-Z]/.test(pwd)) missing.push('at least one letter');
+    if (!/[0-9]/.test(pwd)) missing.push('at least one number');
+    if (!/[^a-zA-Z0-9]/.test(pwd)) missing.push('at least one special symbol');
+
+    if (missing.length > 0) {
+      return res.status(400).json({
+        error: `Password requirements not met. Missing: ${missing.join(', ')}.`
+      });
+    }
+
+    const validRoles = ['super_admin', 'resource_manager', 'department_head', 'staff', 'auditor'];
+    const userRole = validRoles.includes(role) ? role : 'staff';
+    const userDept = department || 'IT Department';
+
+    // Check for duplicate email
+    const existing = await query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'A user with this email already exists' });
+    }
+
+    const result = await query(
+      'INSERT INTO users (name, email, password, role, department) VALUES (?, ?, ?, ?, ?)',
+      [name, cleanEmail, pwd, userRole, userDept]
+    );
+
+    const newUser = {
+      id: result.insertId,
+      name,
+      email: cleanEmail,
+      password: pwd,
+      role: userRole,
+      department: userDept,
+      no_show_count: 0,
+      penalty_suspended_until: null
+    };
+
+    res.status(201).json({
+      message: `User "${name}" registered successfully as ${userRole}!`,
+      user: newUser
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update User Profile Endpoint (for any user to update their own Name, Email, and Password)
+router.put('/update-profile', authenticateToken, async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    const userId = req.user.id;
+
+    const existingUsers = await query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ error: 'User not found in database.' });
+    }
+    const existing = existingUsers[0];
+
+    const finalName = (name && name.trim()) ? name.trim() : existing.name;
+    const finalEmail = (email && email.trim()) ? email.trim().toLowerCase() : existing.email;
+
+    if (!finalName) {
+      return res.status(400).json({ error: 'Name cannot be empty.' });
+    }
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!finalEmail || !gmailRegex.test(finalEmail)) {
+      return res.status(400).json({ error: 'Only valid Google/Gmail accounts (@gmail.com) are accepted.' });
+    }
+
+    let finalPassword = existing.password;
+    if (password && password.trim() !== '') {
+      const pwd = password.trim();
+      const missing = [];
+      if (pwd.length < 8) missing.push('at least 8 characters');
+      if (!/[a-zA-Z]/.test(pwd)) missing.push('at least one letter');
+      if (!/[0-9]/.test(pwd)) missing.push('at least one number');
+      if (!/[^a-zA-Z0-9]/.test(pwd)) missing.push('at least one special symbol (@, #, $, !)');
+
+      if (missing.length > 0) {
+        return res.status(400).json({
+          error: `Password requirements not met. Missing: ${missing.join(', ')}.`
+        });
+      }
+      finalPassword = pwd;
+    }
+
+    // Check if new email is already taken by another user
+    if (finalEmail.toLowerCase() !== (existing.email || '').toLowerCase()) {
+      const duplicate = await query('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?', [finalEmail.toLowerCase(), userId]);
+      if (duplicate.length > 0) {
+        return res.status(400).json({ error: 'Email address is already in use by another account.' });
+      }
+    }
+
+    await query(
+      'UPDATE users SET name = ?, email = ?, password = ? WHERE id = ?',
+      [finalName, finalEmail, finalPassword, userId]
+    );
+
+    const updated = await query('SELECT id, name, email, password, role, department, no_show_count, penalty_suspended_until FROM users WHERE id = ?', [userId]);
+    const updatedUser = updated[0];
+
+    // Real-time broadcast so Super Admin and all clients see updated user data immediately
+    if (req.io) {
+      req.io.emit('user_updated', {
+        userId,
+        name: finalName,
+        email: finalEmail,
+        role: updatedUser.role,
+        department: updatedUser.department
+      });
+    }
+
+    res.json({
+      message: 'Profile updated successfully in database!',
+      user: updatedUser
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update User Email Endpoint (for real email notification configuration)
+router.put('/update-email', authenticateToken, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!cleanEmail || !gmailRegex.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Only valid Google/Gmail accounts (@gmail.com) are accepted.' });
+    }
+
+    await query('UPDATE users SET email = ? WHERE id = ?', [cleanEmail, req.user.id]);
+    const users = await query('SELECT id, name, email, role, department, no_show_count, penalty_suspended_until FROM users WHERE id = ?', [req.user.id]);
+    
+    if (req.io) {
+      req.io.emit('user_updated', { userId: req.user.id, email });
+    }
+
+    res.json({
+      message: 'Email notification address updated successfully!',
+      user: users[0]
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send Test Email Endpoint
+router.post('/test-email', authenticateToken, async (req, res) => {
+  try {
+    const userEmail = req.body.email || req.user.email;
+    const result = await sendEmail({
+      to: userEmail,
+      subject: 'Shared Resource Scheduler - Test Notification',
+      html: `<div style="font-family: sans-serif; padding: 15px; border: 1px solid #2563eb; border-radius: 8px;"><h3 style="color: #2563eb;">📧 Email Notification Test Successful!</h3><p>Your account is configured to receive email notifications at <strong>${userEmail}</strong>.</p></div>`
+    });
+
+    if (result.success) {
+      res.json({
+        message: `Test email successfully dispatched to ${userEmail}!`,
+        summary: result.summary || `Dispatched email to ${userEmail}`,
+        previewUrl: result.previewUrl
+      });
+    } else {
+      res.status(500).json({ error: result.error || 'Failed to dispatch email' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Update User Endpoint (Super Admin only)
+router.put('/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Access denied: only Super Admin can update users' });
+    }
+    const { id } = req.params;
+    const { name, email, password, role, department } = req.body;
+
+    const existingUsers = await query('SELECT * FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const existing = existingUsers[0];
+
+    const cleanEmail = (email && email.trim()) ? email.trim().toLowerCase() : existing.email;
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (email && !gmailRegex.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Only valid Google/Gmail accounts (@gmail.com) are accepted.' });
+    }
+
+    let finalPassword = existing.password;
+    if (password && password.trim() !== '') {
+      const pwd = password.trim();
+      const missing = [];
+      if (pwd.length < 8) missing.push('at least 8 characters');
+      if (!/[a-zA-Z]/.test(pwd)) missing.push('at least one letter');
+      if (!/[0-9]/.test(pwd)) missing.push('at least one number');
+      if (!/[^a-zA-Z0-9]/.test(pwd)) missing.push('at least one special symbol');
+
+      if (missing.length > 0) {
+        return res.status(400).json({
+          error: `Password requirements not met. Missing: ${missing.join(', ')}.`
+        });
+      }
+      finalPassword = pwd;
+    }
+
+    await query(
+      'UPDATE users SET name = ?, email = ?, password = ?, role = ?, department = ? WHERE id = ?',
+      [name, email, finalPassword, role, department, id]
+    );
+
+    const updated = await query('SELECT id, name, email, password, role, department, no_show_count, penalty_suspended_until FROM users WHERE id = ?', [id]);
+    res.json({ message: 'User updated successfully', user: updated[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete User Endpoint (Super Admin only)
+router.delete('/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Access denied: only Super Admin can delete users' });
+    }
+    const { id } = req.params;
+    await query('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Forgot Password Endpoint
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Please enter your registered email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const users = await query('SELECT * FROM users WHERE LOWER(email) = ?', [cleanEmail]);
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'No account found with this email address.' });
+    }
+
+    const user = users[0];
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+
+    await query(
+      'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
+      [resetToken, expiresAt, user.id]
+    );
+
+    // Determine client origin if available from request
+    const clientOrigin = req.body.origin || req.get('origin') || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+
+    // Send Real-time email with Reset link
+    const emailResult = await sendPasswordResetEmail(user.email, resetToken, user.name, clientOrigin);
+
+    if (emailResult.success) {
+      res.json({
+        success: true,
+        message: `A password reset link has been sent to ${user.email}. Please check your inbox (and spam folder).`
+      });
+    } else {
+      res.status(500).json({
+        error: `Could not send email: ${emailResult.error || 'SMTP/OAuth error'}. Please verify email settings.`
+      });
+    }
+  } catch (err) {
+    console.error('[Forgot Password Error]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Verify Reset Token
+router.get('/verify-reset-token/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ valid: false, error: 'Token is required' });
+    }
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const users = await query(
+      'SELECT id, name, email FROM users WHERE reset_token = ? AND reset_token_expires >= ?',
+      [token, now]
+    );
+
+    if (users.length === 0) {
+      return res.status(400).json({ valid: false, error: 'Invalid or expired password reset link.' });
+    }
+
+    res.json({ valid: true, email: users[0].email, name: users[0].name });
+  } catch (err) {
+    res.status(500).json({ valid: false, error: err.message });
+  }
+});
+
+// Reset Password Endpoint
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Reset token is required.' });
+    }
+
+    const pwd = String(newPassword || '').trim();
+    const hasLetter = /[a-zA-Z]/.test(pwd);
+    const hasNumber = /[0-9]/.test(pwd);
+    const hasSymbol = /[^a-zA-Z0-9]/.test(pwd);
+
+    if (!pwd || pwd.length < 8 || !hasLetter || !hasNumber || !hasSymbol) {
+      return res.status(400).json({
+        error: 'Password must be at least 8 characters long and contain letters, numbers, and special symbols (@, #, $, etc.).'
+      });
+    }
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const users = await query(
+      'SELECT id, name, email FROM users WHERE reset_token = ? AND reset_token_expires >= ?',
+      [token, now]
+    );
+
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Password reset link has expired or is invalid. Please request a new one.' });
+    }
+
+    const user = users[0];
+
+    await query(
+      'UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
+      [newPassword.trim(), user.id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Your password has been successfully updated! You can now log in with your new password.'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
+
+

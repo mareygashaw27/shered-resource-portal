@@ -1,0 +1,15 @@
+{
+  "name": "Shered-resource-portal",
+  "version": "1.0.0",
+  "description": "Wollo University Shered Resource Portal",
+  "scripts": {
+    "dev": "npm --prefix front-end run dev",
+    "build": "npm --prefix front-end run build",
+    "server": "node back-end/server.js",
+    "backend": "npm --prefix back-end run dev",
+    "start": "node back-end/server.js"
+  },
+  "keywords": [],
+  "author": "3rd Year Team",
+  "license": "ISC"
+}
