@@ -58,7 +58,7 @@ async function getTransporter() {
   return transporter;
 }
 
-const DEFAULT_FROM = process.env.SMTP_FROM || (process.env.EMAIL_USER ? `"Resource Scheduler" <${process.env.EMAIL_USER}>` : '"Resource Scheduler" <no-reply@organization.org>');
+const DEFAULT_FROM = process.env.SMTP_FROM || (process.env.EMAIL_USER ? `"Resource Scheduler" <${process.env.EMAIL_USER}>` : '"Resource Scheduler" <mareygashaw21@gmail.com>');
 
 /**
  * Generic email dispatcher with guaranteed immediate console & API output

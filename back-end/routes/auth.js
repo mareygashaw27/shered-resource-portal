@@ -85,8 +85,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Name and email are required' });
     }
 
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    if (!gmailRegex.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Only valid Google/Gmail accounts (@gmail.com) are accepted.' });
+    }
+
     // Check if email already exists
-    const existing = await query('SELECT id FROM users WHERE email = ?', [email]);
+    const existing = await query('SELECT id FROM users WHERE email = ?', [cleanEmail]);
     if (existing.length > 0) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }

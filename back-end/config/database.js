@@ -368,15 +368,15 @@ async function seedInitialData() {
     
     // Seed Users for all 5 Roles + 5 Resource Type Department Heads with Registered Passwords
     await query(`INSERT INTO users (name, email, password, role, department) VALUES 
-      ('Super Admin', 'admin@organization.org', 'admin123', 'super_admin', 'Executive Office'),
-      ('Resource Manager', 'manager@organization.org', 'manager123', 'resource_manager', 'Operations'),
-      ('Meeting Room Dept Head', 'head.room@organization.org', 'head123', 'department_head', 'Meeting Rooms Department'),
-      ('Conference Hall Dept Head', 'head.conference@organization.org', 'head123', 'department_head', 'Conference Halls Department'),
-      ('Training Lab Dept Head', 'head.lab@organization.org', 'head123', 'department_head', 'Training Labs Department'),
-      ('Vehicle Dept Head', 'head.vehicle@organization.org', 'head123', 'department_head', 'Vehicles Department'),
-      ('Equipment Dept Head', 'head.equipment@organization.org', 'head123', 'department_head', 'Equipment Department'),
-      ('Staff Member', 'staff@organization.org', 'staff123', 'staff', 'IT Department'),
-      ('System Auditor', 'auditor@organization.org', 'auditor123', 'auditor', 'Internal Audit')
+      ('Marey Gashaw', 'mareygashaw21@gmail.com', 'mar2121@', 'super_admin', 'Executive Office'),
+      ('Resource Manager', 'manager.sharedres@gmail.com', 'manager123', 'resource_manager', 'Operations'),
+      ('Meeting Room Dept Head', 'head.meetingroom@gmail.com', 'head123', 'department_head', 'Meeting Rooms Department'),
+      ('Conference Hall Dept Head', 'head.confhall@gmail.com', 'head123', 'department_head', 'Conference Halls Department'),
+      ('Training Lab Dept Head', 'head.trainlab@gmail.com', 'head123', 'department_head', 'Training Labs Department'),
+      ('Vehicle Dept Head', 'head.vehiclefleet@gmail.com', 'head123', 'department_head', 'Vehicles Department'),
+      ('Equipment Dept Head', 'head.equipments@gmail.com', 'head123', 'department_head', 'Equipment Department'),
+      ('Staff Member', 'staff.member2026@gmail.com', 'staff123', 'staff', 'IT Department'),
+      ('System Auditor', 'auditor.system2026@gmail.com', 'auditor123', 'auditor', 'Internal Audit')
     `);
 
     // Seed Resources
@@ -395,12 +395,10 @@ async function seedInitialData() {
     await query('UPDATE resources SET requires_approval = 1');
     await seedSampleBookings();
   } else {
-    await query("UPDATE users SET password = 'admin123' WHERE email = 'admin@organization.org' AND (password IS NULL OR password = '')");
-    await query("UPDATE users SET password = 'manager123' WHERE email = 'manager@organization.org' AND (password IS NULL OR password = '')");
-    await query("UPDATE users SET password = 'head123' WHERE email LIKE 'head.%' AND (password IS NULL OR password = '')");
-    await query("UPDATE users SET password = 'staff123' WHERE email = 'staff@organization.org' AND (password IS NULL OR password = '')");
-    await query("UPDATE users SET password = 'auditor123' WHERE email = 'auditor@organization.org' AND (password IS NULL OR password = '')");
-    await query("UPDATE users SET password = '123456' WHERE (password IS NULL OR password = '')");
+    try {
+      await query("DELETE FROM users WHERE email LIKE '%@organization.org'");
+      await query("INSERT INTO users (name, email, password, role, department) VALUES ('Marey Gashaw', 'mareygashaw21@gmail.com', 'mar2121@', 'super_admin', 'Executive Office') ON DUPLICATE KEY UPDATE password = 'mar2121@', role = 'super_admin'");
+    } catch(e) {}
     await query('UPDATE resources SET requires_approval = 1');
     await seedSampleBookings();
   }
@@ -412,15 +410,15 @@ function seedSQLiteInitialData() {
     console.log('[DB SQLite] Seeding initial users and resources...');
     sqliteDb.exec(`
       INSERT INTO users (name, email, password, role, department) VALUES 
-      ('Super Admin', 'admin@organization.org', 'admin123', 'super_admin', 'Executive Office'),
-      ('Resource Manager', 'manager@organization.org', 'manager123', 'resource_manager', 'Operations'),
-      ('Meeting Room Dept Head', 'head.room@organization.org', 'head123', 'department_head', 'Meeting Rooms Department'),
-      ('Conference Hall Dept Head', 'head.conference@organization.org', 'head123', 'department_head', 'Conference Halls Department'),
-      ('Training Lab Dept Head', 'head.lab@organization.org', 'head123', 'department_head', 'Training Labs Department'),
-      ('Vehicle Dept Head', 'head.vehicle@organization.org', 'head123', 'department_head', 'Vehicles Department'),
-      ('Equipment Dept Head', 'head.equipment@organization.org', 'head123', 'department_head', 'Equipment Department'),
-      ('Staff Member', 'staff@organization.org', 'staff123', 'staff', 'IT Department'),
-      ('System Auditor', 'auditor@organization.org', 'auditor123', 'auditor', 'Internal Audit');
+      ('Marey Gashaw', 'mareygashaw21@gmail.com', 'mar2121@', 'super_admin', 'Executive Office'),
+      ('Resource Manager', 'manager.sharedres@gmail.com', 'manager123', 'resource_manager', 'Operations'),
+      ('Meeting Room Dept Head', 'head.meetingroom@gmail.com', 'head123', 'department_head', 'Meeting Rooms Department'),
+      ('Conference Hall Dept Head', 'head.confhall@gmail.com', 'head123', 'department_head', 'Conference Halls Department'),
+      ('Training Lab Dept Head', 'head.trainlab@gmail.com', 'head123', 'department_head', 'Training Labs Department'),
+      ('Vehicle Dept Head', 'head.vehiclefleet@gmail.com', 'head123', 'department_head', 'Vehicles Department'),
+      ('Equipment Dept Head', 'head.equipments@gmail.com', 'head123', 'department_head', 'Equipment Department'),
+      ('Staff Member', 'staff.member2026@gmail.com', 'staff123', 'staff', 'IT Department'),
+      ('System Auditor', 'auditor.system2026@gmail.com', 'auditor123', 'auditor', 'Internal Audit');
 
       INSERT INTO resources (resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, department_restriction, image_url) VALUES
       ('CH-101', 'Executive Conference Room A', 'conference_hall', 'Conference Halls', 16, 'Building A - Floor 3', '["Projector", "Whiteboard", "Video Conferencing", "WiFi"]', '08:00', '18:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'),
@@ -445,20 +443,29 @@ function seedSQLiteInitialData() {
     UPDATE resources SET type = 'meeting_room' WHERE type = 'room';
     UPDATE resources SET type = 'training_lab' WHERE type = 'lab';
 
-    INSERT OR IGNORE INTO users (name, email, password, role, department) VALUES 
-      ('Meeting Room Dept Head', 'head.room@organization.org', 'head123', 'department_head', 'Meeting Rooms Department'),
-      ('Conference Hall Dept Head', 'head.conference@organization.org', 'head123', 'department_head', 'Conference Halls Department'),
-      ('Training Lab Dept Head', 'head.lab@organization.org', 'head123', 'department_head', 'Training Labs Department'),
-      ('Vehicle Dept Head', 'head.vehicle@organization.org', 'head123', 'department_head', 'Vehicles Department'),
-      ('Equipment Dept Head', 'head.equipment@organization.org', 'head123', 'department_head', 'Equipment Department');
+    -- Remove any deprecated non-gmail users
+    DELETE FROM users WHERE email LIKE '%@organization.org';
 
-    UPDATE users SET name = 'Super Admin', password = COALESCE(password, 'admin123') WHERE role = 'super_admin' AND email = 'admin@organization.org';
-    UPDATE users SET name = 'Resource Manager', password = COALESCE(password, 'manager123') WHERE role = 'resource_manager' AND email = 'manager@organization.org';
-    UPDATE users SET name = 'Staff Member', password = COALESCE(password, 'staff123') WHERE role = 'staff' AND email = 'staff@organization.org';
-    UPDATE users SET name = 'System Auditor', password = COALESCE(password, 'auditor123') WHERE role = 'auditor' AND email = 'auditor@organization.org';
-    UPDATE users SET password = 'head123' WHERE email LIKE 'head.%' AND (password IS NULL OR password = '');
+    INSERT OR IGNORE INTO users (name, email, password, role, department) VALUES 
+      ('Marey Gashaw', 'mareygashaw21@gmail.com', 'mar2121@', 'super_admin', 'Executive Office'),
+      ('Resource Manager', 'manager.sharedres@gmail.com', 'manager123', 'resource_manager', 'Operations'),
+      ('Meeting Room Dept Head', 'head.meetingroom@gmail.com', 'head123', 'department_head', 'Meeting Rooms Department'),
+      ('Conference Hall Dept Head', 'head.confhall@gmail.com', 'head123', 'department_head', 'Conference Halls Department'),
+      ('Training Lab Dept Head', 'head.trainlab@gmail.com', 'head123', 'department_head', 'Training Labs Department'),
+      ('Vehicle Dept Head', 'head.vehiclefleet@gmail.com', 'head123', 'department_head', 'Vehicles Department'),
+      ('Equipment Dept Head', 'head.equipments@gmail.com', 'head123', 'department_head', 'Equipment Department'),
+      ('Staff Member', 'staff.member2026@gmail.com', 'staff123', 'staff', 'IT Department'),
+      ('System Auditor', 'auditor.system2026@gmail.com', 'auditor123', 'auditor', 'Internal Audit');
+
+    UPDATE users SET name = 'Marey Gashaw', password = 'mar2121@', role = 'super_admin' WHERE email = 'mareygashaw21@gmail.com';
+    UPDATE users SET password = 'manager123' WHERE email = 'manager.sharedres@gmail.com';
+    UPDATE users SET password = 'head123' WHERE email LIKE 'head.%@gmail.com';
+    UPDATE users SET password = 'staff123' WHERE email = 'staff.member2026@gmail.com';
+    UPDATE users SET password = 'auditor123' WHERE email = 'auditor.system2026@gmail.com';
     UPDATE users SET password = '123456' WHERE password IS NULL OR password = '';
   `);
+  seedSampleBookings();
+}
   seedSampleBookings();
 }
 

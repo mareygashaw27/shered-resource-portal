@@ -57,11 +57,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const roleDefaults = {
-    super_admin: { id: 1, name: 'Super Admin', email: 'admin@gmail.com', role: 'super_admin', department: 'Executive Office', no_show_count: 0, penalty_suspended_until: null },
-    resource_manager: { id: 2, name: 'Resource Manager', email: 'manager@organization.org', role: 'resource_manager', department: 'Operations', no_show_count: 0, penalty_suspended_until: null },
-    department_head: { id: 3, name: 'Department Head', email: 'head@organization.org', role: 'department_head', department: 'IT Department', no_show_count: 0, penalty_suspended_until: null },
-    staff: { id: 4, name: 'Staff Member', email: 'staff@organization.org', role: 'staff', department: 'IT Department', no_show_count: 0, penalty_suspended_until: null },
-    auditor: { id: 5, name: 'System Auditor', email: 'auditor@organization.org', role: 'auditor', department: 'Internal Audit', no_show_count: 0, penalty_suspended_until: null }
+    super_admin: { id: 1, name: 'Marey Gashaw', email: 'mareygashaw21@gmail.com', role: 'super_admin', department: 'Executive Office', no_show_count: 0, penalty_suspended_until: null },
+    resource_manager: { id: 2, name: 'Resource Manager', email: 'manager.sharedres@gmail.com', role: 'resource_manager', department: 'Operations', no_show_count: 0, penalty_suspended_until: null },
+    department_head: { id: 3, name: 'Department Head', email: 'head.meetingroom@gmail.com', role: 'department_head', department: 'Meeting Rooms Department', no_show_count: 0, penalty_suspended_until: null },
+    staff: { id: 4, name: 'Staff Member', email: 'staff.member2026@gmail.com', role: 'staff', department: 'IT Department', no_show_count: 0, penalty_suspended_until: null },
+    auditor: { id: 5, name: 'System Auditor', email: 'auditor.system2026@gmail.com', role: 'auditor', department: 'Internal Audit', no_show_count: 0, penalty_suspended_until: null }
   };
 
   const login = async (email, password) => {

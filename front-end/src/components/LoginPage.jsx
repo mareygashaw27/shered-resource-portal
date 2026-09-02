@@ -284,7 +284,7 @@ export default function LoginPage() {
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     className="login-field-input"
-                    placeholder="user@organization.org"
+                    placeholder="username@gmail.com"
                     required
                     style={{ paddingLeft: 38 }}
                   />
