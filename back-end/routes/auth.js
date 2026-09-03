@@ -467,23 +467,38 @@ router.post('/forgot-password', async (req, res) => {
     const clientOrigin = req.body.origin || req.get('origin') || (req.headers.referer ? new URL(req.headers.referer).origin : 'https://shered-resource-portal.vercel.app');
     const resetUrl = `${clientOrigin}/reset-password?token=${resetToken}`;
 
-    // Send Real-time email with Reset link (fast timeout to prevent cloud hanging)
+    // Send Real-time email with Reset link (25s timeout for cloud networks)
     let emailSent = false;
+    let emailError = null;
     try {
       const emailPromise = sendPasswordResetEmail(user.email, resetToken, user.name, clientOrigin);
-      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'SMTP Timeout after 12s' }), 12000));
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'SMTP Timeout after 25s' }), 25000));
       const emailResult = await Promise.race([emailPromise, timeoutPromise]);
       emailSent = emailResult && emailResult.success;
       if (!emailSent && emailResult && emailResult.error) {
+        emailError = emailResult.error;
         console.warn('[Forgot Password] Email send result:', emailResult.error);
       }
     } catch (e) {
+      emailError = e.message;
       console.warn('[Forgot Password] Email notice:', e.message);
+    }
+
+    if (!emailSent) {
+      console.warn('[Forgot Password] Email delivery failed:', emailError);
+      return res.status(502).json({
+        success: false,
+        emailSent: false,
+        error: `ወደ ${user.email} ኢሜይል መላክ አልተቻለም። ምክንያት፦ ${emailError || 'የሰርቨር ግንኙነት ችግር (SMTP Timeout)'}።`,
+        errorEn: `Could not send email to ${user.email}. Reason: ${emailError || 'SMTP connection timeout'}.`,
+        resetToken,
+        resetUrl
+      });
     }
 
     res.json({
       success: true,
-      emailSent,
+      emailSent: true,
       message: 'የይለፍ ቃል መቀየሪያ ሊንክ ወደ ኢሜይልዎ ተልኳል፤ እባክዎ ኢሜይልዎን ከፍተው ሊንኩን በመጫን የይለፍ ቃልዎን ይቀይሩ።',
       messageEn: `A password reset link has been sent to ${user.email}. Please check your inbox and follow the link to reset your password.`,
       resetToken,

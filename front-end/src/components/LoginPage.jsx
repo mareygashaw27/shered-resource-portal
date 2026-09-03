@@ -199,13 +199,38 @@ export default function LoginPage() {
           )}
 
           {forgotSuccess && (
-            <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '14px 16px', borderRadius: 8, fontSize: 13, marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <CheckCircle2 size={20} style={{ flexShrink: 0, marginTop: 1, color: '#16a34a' }} />
-              <div style={{ lineHeight: 1.5, textAlign: 'left' }}>
-                <strong style={{ display: 'block', marginBottom: 3, color: '#166534', fontSize: 13.5 }}>
-                  {lang === 'am' ? 'የይለፍ ቃል መቀየሪያ ሊንክ ተልኳል!' : 'Reset Link Sent!'}
+            <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '16px', borderRadius: 10, fontSize: 13, marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <CheckCircle2 size={20} style={{ flexShrink: 0, marginTop: 2, color: '#16a34a' }} />
+              <div style={{ lineHeight: 1.5, textAlign: 'left', width: '100%' }}>
+                <strong style={{ display: 'block', marginBottom: 4, color: '#166534', fontSize: 14 }}>
+                  {lang === 'am' ? 'የይለፍ ቃል መቀየሪያ ሊንክ ተዘጋጅቷል!' : 'Reset Link Ready!'}
                 </strong>
-                <div>{forgotSuccess}</div>
+                <div style={{ marginBottom: resetUrl ? 12 : 0 }}>{forgotSuccess}</div>
+                {resetUrl && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #86efac' }}>
+                    <div style={{ fontSize: 12, color: '#166534', marginBottom: 8, fontWeight: 500 }}>
+                      {lang === 'am' ? '💡 ኢሜይሉ እስኪደርስዎት ሳይጠብቁ እዚህ በመጫን ወዲያውኑ የይለፍ ቃልዎን መቀየር ይችላሉ፦' : '💡 Or click below to reset your password immediately without waiting:'}
+                    </div>
+                    <a
+                      href={resetUrl}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: '#16a34a',
+                        color: '#ffffff',
+                        padding: '8px 16px',
+                        borderRadius: 6,
+                        textDecoration: 'none',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
+                      }}
+                    >
+                      {lang === 'am' ? 'የይለፍ ቃልዎን አሁን ይቀይሩ ➔' : 'Reset Password Now ➔'}
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -23,11 +23,16 @@ async function getTransporter() {
     const cleanUser = String(emailUser).trim();
     console.log(`[Email Service] Initializing live Gmail SSL transporter for ${cleanUser}`);
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         user: cleanUser,
         pass: cleanPass
       },
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 25000,
       tls: {
         rejectUnauthorized: false
       }
