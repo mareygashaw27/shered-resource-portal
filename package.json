@@ -7,7 +7,8 @@
     "build": "npm --prefix front-end run build",
     "server": "node back-end/server.js",
     "backend": "npm --prefix back-end run dev",
-    "start": "node back-end/server.js"
+    "start": "node back-end/server.js",
+    "postinstall": "npm --prefix back-end install"
   },
   "keywords": [],
   "author": "3rd Year Team",
