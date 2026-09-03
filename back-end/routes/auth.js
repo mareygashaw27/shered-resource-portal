@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { query } = require('../config/database');
+const { query, defaultAccounts } = require('../config/database');
 const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
 const { sendEmail, sendPasswordResetEmail } = require('../services/emailService');
 
@@ -32,7 +32,26 @@ router.post('/login', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
 
     // 1. Query registered user strictly from database by email or name
-    const users = await query('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?', [cleanEmail, cleanEmail]);
+    let users = await query('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?', [cleanEmail, cleanEmail]);
+
+    // Bulletproof Auto-Heal: If default admin/system account is missing from database (e.g. freshly deployed empty DB)
+    if (users.length === 0 && defaultAccounts) {
+      const match = defaultAccounts.find(
+        acc => acc.email.toLowerCase() === cleanEmail || acc.name.toLowerCase() === cleanEmail
+      );
+      if (match) {
+        try {
+          await query(
+            'INSERT INTO users (name, email, password, role, department) VALUES (?, ?, ?, ?, ?)',
+            [match.name, match.email.toLowerCase(), match.password, match.role, match.department]
+          );
+          users = await query('SELECT * FROM users WHERE LOWER(email) = ?', [match.email.toLowerCase()]);
+          console.log(`[Auth] Auto-restored default account on login: ${match.email}`);
+        } catch (e) {
+          console.error('[Auth Fallback] Failed auto-provisioning account:', e.message);
+        }
+      }
+    }
 
     if (users.length === 0) {
       return res.status(401).json({ error: 'Access denied: User is not registered in the system by Admin.' });

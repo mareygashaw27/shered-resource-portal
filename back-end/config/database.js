@@ -57,6 +57,9 @@ async function initDatabase() {
     seedSQLiteInitialData();
     console.log(`[DB] Using SQLite fallback database at ${dbPath}`);
   }
+
+  // Always ensure all default admin and role accounts exist and have valid passwords regardless of DB engine
+  await ensureDefaultUsersAndRoles();
 }
 
 // Unified Execute Helper
@@ -207,6 +210,9 @@ async function createMySQLTables() {
   for (const sql of tables) {
     await pool.query(sql);
   }
+  try {
+    await pool.query("ALTER TABLE users MODIFY COLUMN role ENUM('super_admin', 'resource_manager', 'department_head', 'staff', 'auditor') NOT NULL DEFAULT 'staff';");
+  } catch (e) {}
   try {
     await pool.query('ALTER TABLE users ADD COLUMN password VARCHAR(255) NULL;');
   } catch (e) {}
@@ -466,15 +472,49 @@ function seedSQLiteInitialData() {
   `);
   seedSampleBookings();
 }
-  seedSampleBookings();
-}
 
-async function seedSampleBookings() {
-  // Do not seed sample bookings — keep bookings empty per user request
+const defaultAccounts = [
+  { name: 'Marey Gashaw', email: 'mareygashaw21@gmail.com', password: 'mar2121@', role: 'super_admin', department: 'Executive Office' },
+  { name: 'Resource Manager', email: 'manager.sharedres@gmail.com', password: 'manager123', role: 'resource_manager', department: 'Operations' },
+  { name: 'Meeting Room Dept Head', email: 'head.meetingroom@gmail.com', password: 'head123', role: 'department_head', department: 'Meeting Rooms Department' },
+  { name: 'Conference Hall Dept Head', email: 'head.confhall@gmail.com', password: 'head123', role: 'department_head', department: 'Conference Halls Department' },
+  { name: 'Training Lab Dept Head', email: 'head.trainlab@gmail.com', password: 'head123', role: 'department_head', department: 'Training Labs Department' },
+  { name: 'Vehicle Dept Head', email: 'head.vehiclefleet@gmail.com', password: 'head123', role: 'department_head', department: 'Vehicles Department' },
+  { name: 'Equipment Dept Head', email: 'head.equipments@gmail.com', password: 'head123', role: 'department_head', department: 'Equipment Department' },
+  { name: 'Staff Member', email: 'staff.member2026@gmail.com', password: 'staff123', role: 'staff', department: 'IT Department' },
+  { name: 'System Auditor', email: 'auditor.system2026@gmail.com', password: 'auditor123', role: 'auditor', department: 'Internal Audit' }
+];
+
+async function ensureDefaultUsersAndRoles() {
+  try {
+    await query("DELETE FROM users WHERE email LIKE '%@organization.org'");
+  } catch (e) {}
+
+  for (const acc of defaultAccounts) {
+    try {
+      const cleanEmail = acc.email.trim().toLowerCase();
+      const existing = await query('SELECT id, password, role FROM users WHERE LOWER(email) = ?', [cleanEmail]);
+      if (!existing || existing.length === 0) {
+        await query(
+          'INSERT INTO users (name, email, password, role, department) VALUES (?, ?, ?, ?, ?)',
+          [acc.name, cleanEmail, acc.password, acc.role, acc.department]
+        );
+        console.log(`[DB] Created default account: ${cleanEmail} (${acc.role})`);
+      } else {
+        await query(
+          'UPDATE users SET name = ?, password = ?, role = ?, department = ? WHERE LOWER(email) = ?',
+          [acc.name, acc.password, acc.role, acc.department, cleanEmail]
+        );
+      }
+    } catch (err) {
+      console.error(`[DB Error] Ensuring default user ${acc.email}:`, err.message);
+    }
+  }
 }
 
 module.exports = {
   initDatabase,
   query,
-  getIsMySQL: () => isMySQL
+  getIsMySQL: () => isMySQL,
+  defaultAccounts
 };
