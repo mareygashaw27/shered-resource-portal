@@ -14,6 +14,8 @@ const dbConfig = {
   user: process.env.DB_USER || '2DHRWERzmLdkLLJ.root',
   password: process.env.DB_PASSWORD || 'oXh91L2hfMbpALyl',
   database: process.env.DB_NAME || 'shered_res',
+  timezone: '+03:00', // Ethiopian Real Time (East Africa Time, UTC+3)
+  dateStrings: true,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -57,6 +59,13 @@ async function initDatabase() {
     const testConn = await pool.getConnection();
     await testConn.ping();
     testConn.release();
+
+    try {
+      await pool.query("SET time_zone = '+03:00';");
+      console.log('[DB] Synchronized MySQL timezone to Ethiopian Real Time (+03:00)');
+    } catch (tzErr) {
+      console.warn('[DB Warning] Setting time_zone:', tzErr.message);
+    }
 
     isMySQL = true;
     console.log(`[DB] Connected successfully to Cloud MySQL database "${dbConfig.database}" on ${dbConfig.host}:${dbConfig.port}`);

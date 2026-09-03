@@ -7,8 +7,8 @@ const { sendNoShowCancellation, sendWaitlistOffer } = require('./emailService');
 function initCronJobs(io) {
   console.log('[Cron] Initializing background tasks (No-show auto-cancellation & SLA tracking)...');
 
-  // Run every 1 minute
-  cron.schedule('* * * * *', async () => {
+  // Run every 5 minutes (real grace period check — not too aggressive)
+  cron.schedule('*/5 * * * *', async () => {
     try {
       await processNoShowCancellations(io);
       await processWaitlistExpirations(io);

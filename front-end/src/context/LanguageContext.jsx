@@ -307,7 +307,8 @@ const translations = {
     reqLetter: 'Contains letters (a-z, A-Z)',
     reqNumber: 'Contains numbers (0-9)',
     reqSymbol: 'Contains special symbol (!@#$%^&*)',
-    invalidResetLink: 'This password reset link is invalid or has expired.'
+    invalidResetLink: 'This password reset link is invalid or has expired.',
+    resetLinkSentSuccess: 'A password reset link has been sent to your email. Please check your inbox (or spam) and click the link to reset your password.'
   },
   am: {
     appName: 'የጋራ ሀብት ማኔጅመንት ሲስተም',
@@ -613,7 +614,8 @@ const translations = {
     reqLetter: 'ፊደል ያካተተ (a-z, A-Z)',
     reqNumber: 'ቁጥር ያካተተ (0-9)',
     reqSymbol: 'ልዩ ምልክት ያካተተ (!@#$%^&*)',
-    invalidResetLink: 'ይህ የይለፍ ቃል መቀየሪያ ሊንክ ትክክል አይደለም ወይም ጊዜው አልፏል።'
+    invalidResetLink: 'ይህ የይለፍ ቃል መቀየሪያ ሊንክ ትክክል አይደለም ወይም ጊዜው አልፏል።',
+    resetLinkSentSuccess: 'የይለፍ ቃል መቀየሪያ ሊንክ ወደ ኢሜይልዎ ተልኳል፤ እባክዎ ኢሜይልዎን (Inbox ወይም Spam ፎልደር) ከፍተው ሊንኩን በመጫን የይለፍ ቃልዎን ይቀይሩ።'
   }
 };
 

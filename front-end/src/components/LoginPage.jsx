@@ -68,7 +68,7 @@ export default function LoginPage() {
       setForgotSubmitting(false);
 
       if (res.ok && data.success) {
-        setForgotSuccess(data.message);
+        setForgotSuccess(t('resetLinkSentSuccess') || data.message);
         if (data.resetUrl) {
           setResetUrl(data.resetUrl);
         }
@@ -199,9 +199,14 @@ export default function LoginPage() {
           )}
 
           {forgotSuccess && (
-            <div style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: 14, borderRadius: 8, fontSize: 13, marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 2 }} />
-              <span style={{ lineHeight: 1.4 }}>{forgotSuccess}</span>
+            <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '14px 16px', borderRadius: 8, fontSize: 13, marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <CheckCircle2 size={20} style={{ flexShrink: 0, marginTop: 1, color: '#16a34a' }} />
+              <div style={{ lineHeight: 1.5, textAlign: 'left' }}>
+                <strong style={{ display: 'block', marginBottom: 3, color: '#166534', fontSize: 13.5 }}>
+                  {lang === 'am' ? 'የይለፍ ቃል መቀየሪያ ሊንክ ተልኳል!' : 'Reset Link Sent!'}
+                </strong>
+                <div>{forgotSuccess}</div>
+              </div>
             </div>
           )}
 

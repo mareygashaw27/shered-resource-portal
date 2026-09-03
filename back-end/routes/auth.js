@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { query, defaultAccounts } = require('../config/database');
+const { query, defaultAccounts, getIsMySQL } = require('../config/database');
 const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
 const { sendEmail, sendPasswordResetEmail } = require('../services/emailService');
 
@@ -412,6 +412,30 @@ router.delete('/users/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Reset No-Show Count (Super Admin only) — clears no-show count and suspension for a user
+router.post('/users/:id/reset-noshow', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Access denied: only Super Admin can reset no-show counts' });
+    }
+    const { id } = req.params;
+    const users = await query('SELECT id, name, email FROM users WHERE id = ?', [id]);
+    if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    await query('UPDATE users SET no_show_count = 0, penalty_suspended_until = NULL WHERE id = ?', [id]);
+    // Also clear penalty history for this user
+    await query('DELETE FROM no_show_penalties WHERE user_id = ?', [id]);
+
+    console.log(`[Admin] No-show count reset for user #${id} (${users[0].name}) by admin #${req.user.id}`);
+    res.json({
+      success: true,
+      message: `No-show count reset for ${users[0].name}. Booking privileges restored.`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Forgot Password Endpoint
 
 router.post('/forgot-password', async (req, res) => {
@@ -430,16 +454,18 @@ router.post('/forgot-password', async (req, res) => {
 
     const user = users[0];
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    
+    // Save in database using native real-time NOW() + 24 hours
+    const isMySQL = getIsMySQL();
+    const updateSql = isMySQL
+      ? 'UPDATE users SET reset_token = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 24 HOUR) WHERE id = ?'
+      : "UPDATE users SET reset_token = ?, reset_token_expires = datetime('now', '+24 hours') WHERE id = ?";
 
-    await query(
-      'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
-      [resetToken, expiresAt, user.id]
-    );
+    await query(updateSql, [resetToken, user.id]);
 
     // Determine client origin if available from request
     const clientOrigin = req.body.origin || req.get('origin') || (req.headers.referer ? new URL(req.headers.referer).origin : 'https://shered-resource-portal.vercel.app');
-    const resetUrl = `${clientOrigin}/#reset-password?token=${resetToken}`;
+    const resetUrl = `${clientOrigin}/reset-password?token=${resetToken}`;
 
     // Send Real-time email with Reset link (fast timeout to prevent cloud hanging)
     let emailSent = false;
@@ -458,9 +484,8 @@ router.post('/forgot-password', async (req, res) => {
     res.json({
       success: true,
       emailSent,
-      message: emailSent
-        ? `A password reset link has been sent to ${user.email}.`
-        : `Password reset link is ready.`,
+      message: 'የይለፍ ቃል መቀየሪያ ሊንክ ወደ ኢሜይልዎ ተልኳል፤ እባክዎ ኢሜይልዎን ከፍተው ሊንኩን በመጫን የይለፍ ቃልዎን ይቀይሩ።',
+      messageEn: `A password reset link has been sent to ${user.email}. Please check your inbox and follow the link to reset your password.`,
       resetToken,
       resetUrl
     });
@@ -478,17 +503,20 @@ router.get('/verify-reset-token/:token', async (req, res) => {
       return res.status(400).json({ valid: false, error: 'Token is required' });
     }
 
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const users = await query(
-      'SELECT id, name, email FROM users WHERE reset_token = ? AND reset_token_expires >= ?',
-      [token, now]
-    );
+    // Verify in real time using database native current time
+    const isMySQL = getIsMySQL();
+    const checkSql = isMySQL
+      ? 'SELECT id, name, email FROM users WHERE reset_token = ? AND (reset_token_expires >= NOW() OR reset_token_expires IS NULL)'
+      : "SELECT id, name, email FROM users WHERE reset_token = ? AND (reset_token_expires >= datetime('now') OR reset_token_expires IS NULL)";
+
+    const users = await query(checkSql, [token]);
 
     if (users.length === 0) {
       return res.status(400).json({ valid: false, error: 'Invalid or expired password reset link.' });
     }
 
-    res.json({ valid: true, email: users[0].email, name: users[0].name });
+    const user = users[0];
+    res.json({ valid: true, email: user.email, name: user.name });
   } catch (err) {
     res.status(500).json({ valid: false, error: err.message });
   }
@@ -514,11 +542,13 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const users = await query(
-      'SELECT id, name, email FROM users WHERE reset_token = ? AND reset_token_expires >= ?',
-      [token, now]
-    );
+    // Check token validity in real time
+    const isMySQL = getIsMySQL();
+    const checkSql = isMySQL
+      ? 'SELECT id, name, email FROM users WHERE reset_token = ? AND (reset_token_expires >= NOW() OR reset_token_expires IS NULL)'
+      : "SELECT id, name, email FROM users WHERE reset_token = ? AND (reset_token_expires >= datetime('now') OR reset_token_expires IS NULL)";
+
+    const users = await query(checkSql, [token]);
 
     if (users.length === 0) {
       return res.status(400).json({ error: 'Password reset link has expired or is invalid. Please request a new one.' });
