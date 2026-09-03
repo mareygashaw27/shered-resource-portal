@@ -7,15 +7,20 @@ let pool = null;
 let sqliteDb = null;
 let isMySQL = false;
 
-// MySQL Config
+// MySQL / TiDB Cloud Config
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
+  host: process.env.DB_HOST || 'gateway01.eu-central-1.prod.aws.tidbcloud.com',
+  port: parseInt(process.env.DB_PORT || '4000'),
+  user: process.env.DB_USER || '2DHRWERzmLdkLLJ.root',
+  password: process.env.DB_PASSWORD || 'oXh91L2hfMbpALyl',
   database: process.env.DB_NAME || 'shered_res',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  ssl: {
+    minVersion: 'TLSv1.2',
+    rejectUnauthorized: false
+  }
 };
 
 const defaultAccounts = [
@@ -35,8 +40,10 @@ async function initDatabase() {
     // Attempt MySQL connection
     const connection = await mysql.createConnection({
       host: dbConfig.host,
+      port: dbConfig.port,
       user: dbConfig.user,
-      password: dbConfig.password
+      password: dbConfig.password,
+      ssl: dbConfig.ssl
     });
 
     // Create database if not exists
@@ -52,9 +59,10 @@ async function initDatabase() {
     testConn.release();
 
     isMySQL = true;
-    console.log(`[DB] Connected successfully to MySQL database "${dbConfig.database}" on ${dbConfig.host}`);
+    console.log(`[DB] Connected successfully to Cloud MySQL database "${dbConfig.database}" on ${dbConfig.host}:${dbConfig.port}`);
     
     await createMySQLTables();
+    await migrateSQLiteDataToMySQL();
     await seedInitialData();
   } catch (err) {
     console.warn(`[DB Warning] Could not connect to MySQL (${err.message}). Falling back to SQLite database for seamless operation.`);
@@ -77,7 +85,7 @@ async function initDatabase() {
 // Unified Execute Helper
 async function query(sql, params = []) {
   if (isMySQL) {
-    const [rows] = await pool.execute(sql, params);
+    const [rows] = await pool.query(sql, params);
     return rows;
   } else {
     // Execute SQLite statement
@@ -88,6 +96,95 @@ async function query(sql, params = []) {
       const info = stmt.run(...params);
       return { insertId: info.lastInsertRowid, affectedRows: info.changes };
     }
+  }
+}
+
+async function migrateSQLiteDataToMySQL() {
+  try {
+    const dbPath = path.join(__dirname, '..', 'shered_res.sqlite');
+    if (!fs.existsSync(dbPath)) return;
+
+    const sqDb = new Database(dbPath);
+    console.log('[DB Migration] Checking SQLite data to transfer into Cloud MySQL...');
+
+    // 1. Users
+    try {
+      const sqUsers = sqDb.prepare('SELECT * FROM users').all();
+      for (const u of sqUsers) {
+        await pool.query(
+          `INSERT INTO users (id, name, email, password, role, department, reset_token, reset_token_expires, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE name=VALUES(name), password=VALUES(password), role=VALUES(role), department=VALUES(department)`,
+          [u.id, u.name, u.email, u.password, u.role, u.department, u.reset_token, u.reset_token_expires, u.created_at || new Date()]
+        );
+      }
+      console.log(`[DB Migration] Transferred ${sqUsers.length} users to Cloud MySQL.`);
+    } catch (e) {
+      console.warn('[DB Migration Users Warning]', e.message);
+    }
+
+    // 2. Resources
+    try {
+      const sqResources = sqDb.prepare('SELECT * FROM resources').all();
+      for (const r of sqResources) {
+        await pool.query(
+          `INSERT INTO resources (id, resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, is_active, department_restriction, image_url)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE name=VALUES(name), type=VALUES(type), category=VALUES(category), capacity=VALUES(capacity), location=VALUES(location), features=VALUES(features), image_url=VALUES(image_url), is_active=VALUES(is_active)`,
+          [r.id, r.resource_uuid, r.name, r.type, r.category, r.capacity, r.location, r.features, r.operating_hours_start, r.operating_hours_end, r.requires_approval, r.requires_checkin, r.is_active ?? 1, r.department_restriction, r.image_url]
+        );
+      }
+      console.log(`[DB Migration] Transferred ${sqResources.length} resources to Cloud MySQL.`);
+    } catch (e) {
+      console.warn('[DB Migration Resources Warning]', e.message);
+    }
+
+    // 3. Bookings
+    try {
+      const sqBookings = sqDb.prepare('SELECT * FROM bookings').all();
+      for (const b of sqBookings) {
+        await pool.query(
+          `INSERT INTO bookings (id, booking_ref, resource_id, user_id, booked_for_user_id, title, start_datetime, end_datetime, is_recurring, recurrence_rule, special_requirements, status, check_in_deadline)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE status=VALUES(status), title=VALUES(title), start_datetime=VALUES(start_datetime), end_datetime=VALUES(end_datetime)`,
+          [b.id, b.booking_ref, b.resource_id, b.user_id, b.booked_for_user_id, b.title, b.start_datetime, b.end_datetime, b.is_recurring, b.recurrence_rule, b.special_requirements, b.status, b.check_in_deadline]
+        );
+      }
+      console.log(`[DB Migration] Transferred ${sqBookings.length} bookings to Cloud MySQL.`);
+    } catch (e) {
+      console.warn('[DB Migration Bookings Warning]', e.message);
+    }
+
+    // 4. Approvals
+    try {
+      const sqApprovals = sqDb.prepare('SELECT * FROM approvals').all();
+      for (const a of sqApprovals) {
+        await pool.query(
+          `INSERT INTO approvals (id, booking_id, approver_id, status, reason, approved_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE status=VALUES(status), reason=VALUES(reason)`,
+          [a.id, a.booking_id, a.approver_id, a.status, a.reason, a.approved_at]
+        );
+      }
+    } catch (e) {}
+
+    // 5. Check-ins
+    try {
+      const sqCheckIns = sqDb.prepare('SELECT * FROM check_ins').all();
+      for (const c of sqCheckIns) {
+        await pool.query(
+          `INSERT INTO check_ins (id, booking_id, checked_in_at, checked_out_at, check_in_method)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE checked_in_at=VALUES(checked_in_at), checked_out_at=VALUES(checked_out_at)`,
+          [c.id, c.booking_id, c.checked_in_at, c.checked_out_at, c.check_in_method]
+        );
+      }
+    } catch (e) {}
+
+    sqDb.close();
+    console.log('[DB Migration] All data successfully synced into Cloud MySQL! 🚀');
+  } catch (err) {
+    console.warn('[DB Migration Warning]', err.message);
   }
 }
 

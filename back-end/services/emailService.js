@@ -237,7 +237,7 @@ async function sendWaitlistOffer(userEmail, waitlistInfo) {
 }
 
 function getFrontendUrl(clientOrigin) {
-  // If client request provided a valid non-localhost origin (e.g. network IP or domain tunnel), use it directly
+  // If client request provided a valid non-localhost origin (e.g. Vercel domain), use it directly
   if (clientOrigin && typeof clientOrigin === 'string') {
     try {
       const url = new URL(clientOrigin);
@@ -249,10 +249,19 @@ function getFrontendUrl(clientOrigin) {
     }
   }
 
-  // Otherwise detect active LAN / Wi-Fi IP address so links work on both PC and mobile devices
+  // If FRONTEND_URL is set in environment, use it
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL.replace(/\/$/, '');
+  }
+
+  // If running in production (Render), default directly to the live Vercel app
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    return 'https://shered-resource-portal.vercel.app';
+  }
+
+  // Otherwise on local dev, detect active Wi-Fi / Ethernet IP address for mobile testing on local network
   try {
     const nets = os.networkInterfaces();
-    // Prioritize Wi-Fi or Ethernet interfaces first
     const preferredNames = Object.keys(nets).sort((a, b) => {
       const aLower = a.toLowerCase();
       const bLower = b.toLowerCase();
@@ -274,7 +283,8 @@ function getFrontendUrl(clientOrigin) {
   } catch (e) {
     // fallback
   }
-  return process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  return 'https://shered-resource-portal.vercel.app';
 }
 
 /**
