@@ -18,6 +18,18 @@ const dbConfig = {
   queueLimit: 0
 };
 
+const defaultAccounts = [
+  { name: 'Marey Gashaw', email: 'mareygashaw21@gmail.com', password: 'mar2121@', role: 'super_admin', department: 'Executive Office' },
+  { name: 'Resource Manager', email: 'manager.sharedres@gmail.com', password: 'manager123', role: 'resource_manager', department: 'Operations' },
+  { name: 'Meeting Room Dept Head', email: 'head.meetingroom@gmail.com', password: 'head123', role: 'department_head', department: 'Meeting Rooms Department' },
+  { name: 'Conference Hall Dept Head', email: 'head.confhall@gmail.com', password: 'head123', role: 'department_head', department: 'Conference Halls Department' },
+  { name: 'Training Lab Dept Head', email: 'head.trainlab@gmail.com', password: 'head123', role: 'department_head', department: 'Training Labs Department' },
+  { name: 'Vehicle Dept Head', email: 'head.vehiclefleet@gmail.com', password: 'head123', role: 'department_head', department: 'Vehicles Department' },
+  { name: 'Equipment Dept Head', email: 'head.equipments@gmail.com', password: 'head123', role: 'department_head', department: 'Equipment Department' },
+  { name: 'Staff Member', email: 'staff.member2026@gmail.com', password: 'staff123', role: 'staff', department: 'IT Department' },
+  { name: 'System Auditor', email: 'auditor.system2026@gmail.com', password: 'auditor123', role: 'auditor', department: 'Internal Audit' }
+];
+
 async function initDatabase() {
   try {
     // Attempt MySQL connection
@@ -472,18 +484,6 @@ function seedSQLiteInitialData() {
   `);
   seedSampleBookings();
 }
-
-const defaultAccounts = [
-  { name: 'Marey Gashaw', email: 'mareygashaw21@gmail.com', password: 'mar2121@', role: 'super_admin', department: 'Executive Office' },
-  { name: 'Resource Manager', email: 'manager.sharedres@gmail.com', password: 'manager123', role: 'resource_manager', department: 'Operations' },
-  { name: 'Meeting Room Dept Head', email: 'head.meetingroom@gmail.com', password: 'head123', role: 'department_head', department: 'Meeting Rooms Department' },
-  { name: 'Conference Hall Dept Head', email: 'head.confhall@gmail.com', password: 'head123', role: 'department_head', department: 'Conference Halls Department' },
-  { name: 'Training Lab Dept Head', email: 'head.trainlab@gmail.com', password: 'head123', role: 'department_head', department: 'Training Labs Department' },
-  { name: 'Vehicle Dept Head', email: 'head.vehiclefleet@gmail.com', password: 'head123', role: 'department_head', department: 'Vehicles Department' },
-  { name: 'Equipment Dept Head', email: 'head.equipments@gmail.com', password: 'head123', role: 'department_head', department: 'Equipment Department' },
-  { name: 'Staff Member', email: 'staff.member2026@gmail.com', password: 'staff123', role: 'staff', department: 'IT Department' },
-  { name: 'System Auditor', email: 'auditor.system2026@gmail.com', password: 'auditor123', role: 'auditor', department: 'Internal Audit' }
-];
 
 async function ensureDefaultUsersAndRoles() {
   try {
