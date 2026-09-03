@@ -508,9 +508,7 @@ router.post('/forgot-password', async (req, res) => {
       success: true,
       emailSent: true,
       message: 'የይለፍ ቃል መቀየሪያ ሊንክ ወደ ኢሜይልዎ ተልኳል፤ እባክዎ ኢሜይልዎን ከፍተው ሊንኩን በመጫን የይለፍ ቃልዎን ይቀይሩ።',
-      messageEn: `A password reset link has been sent to ${user.email}. Please check your inbox and follow the link to reset your password.`,
-      resetToken,
-      resetUrl
+      messageEn: `A password reset link has been sent to ${user.email}. Please check your inbox and follow the link to reset your password.`
     });
   } catch (err) {
     console.error('[Forgot Password Error]', err);

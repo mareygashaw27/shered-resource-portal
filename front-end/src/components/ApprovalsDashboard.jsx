@@ -97,10 +97,11 @@ export default function ApprovalsDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  const [actionLoading, setActionLoading] = useState(false);
 
   const handleAction = async (bookingId, action, reason = null) => {
     setFeedback({ type: '', text: '' });
+    setActionLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/approvals/action`, {
         method: 'POST',
@@ -126,10 +127,16 @@ export default function ApprovalsDashboard() {
           setSelectedBookingDetails(null);
         }
       } else {
-        setFeedback({ type: 'error', text: data.error || 'Failed to update approval action.' });
+        const errMsg = data.error || 'Failed to update approval action.';
+        setFeedback({ type: 'error', text: errMsg });
+        alert(errMsg);
       }
     } catch (err) {
-      setFeedback({ type: 'error', text: lang === 'am' ? 'የግንኙነት ስህተት ተፈጥሯል።' : 'Network connection error.' });
+      const netErr = lang === 'am' ? 'የግንኙነት ስህተት ተፈጥሯል።' : 'Network connection error.';
+      setFeedback({ type: 'error', text: netErr });
+      alert(netErr);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -536,10 +543,11 @@ export default function ApprovalsDashboard() {
               <button className="btn btn-secondary" onClick={() => setRejectReasonModal(null)}>{t('cancel')}</button>
               <button
                 className="btn btn-danger"
-                disabled={!reasonInput.trim()}
+                style={{ background: '#dc2626' }}
+                disabled={!reasonInput.trim() || actionLoading}
                 onClick={() => handleAction(rejectReasonModal, 'rejected', reasonInput.trim())}
               >
-                {t('confirmRejection')}
+                {actionLoading ? (lang === 'am' ? 'በማስኬድ ላይ...' : 'Processing...') : t('confirmRejection')}
               </button>
             </div>
           </div>
@@ -577,9 +585,10 @@ export default function ApprovalsDashboard() {
               <button
                 className="btn btn-primary"
                 style={{ background: '#d97706' }}
+                disabled={actionLoading}
                 onClick={() => handleAction(holdReasonModal, 'hold', holdReasonInput.trim() || 'Additional verification required')}
               >
-                {lang === 'am' ? 'በእንጥልጥል አቁይ (Put on Hold)' : 'Confirm Hold'}
+                {actionLoading ? (lang === 'am' ? 'በማስኬድ ላይ...' : 'Processing...') : (lang === 'am' ? 'በእንጥልጥል አቁይ (Put on Hold)' : 'Confirm Hold')}
               </button>
             </div>
           </div>

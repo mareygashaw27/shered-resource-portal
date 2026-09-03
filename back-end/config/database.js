@@ -346,6 +346,12 @@ async function createMySQLTables() {
   try {
     await pool.query("ALTER TABLE check_ins MODIFY COLUMN check_in_method VARCHAR(50) DEFAULT 'web';");
   } catch (e) {}
+  try {
+    await pool.query("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(50) DEFAULT 'confirmed';");
+  } catch (e) {}
+  try {
+    await pool.query("ALTER TABLE approvals MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending';");
+  } catch (e) {}
 }
 
 function createSQLiteTables() {

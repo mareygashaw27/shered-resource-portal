@@ -86,12 +86,33 @@ router.post('/action', authenticateToken, checkRole(['super_admin', 'resource_ma
     const newStatus = action === 'approved' ? 'confirmed' : (action === 'rejected' ? 'rejected' : 'on_hold');
     const nowStr = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
 
-    await query(`UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newStatus, bookingId]);
+    try {
+      await query(`UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newStatus, bookingId]);
+    } catch (statusErr) {
+      if (statusErr.message && (statusErr.message.includes('truncated') || statusErr.message.includes('enum'))) {
+        try { await query("ALTER TABLE bookings MODIFY COLUMN status VARCHAR(50) DEFAULT 'confirmed';"); } catch (e) {}
+        await query(`UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newStatus, bookingId]);
+      } else {
+        throw statusErr;
+      }
+    }
 
-    await query(`
-      INSERT INTO approvals (booking_id, approver_id, status, reason, approved_at)
-      VALUES (?, ?, ?, ?, ?)
-    `, [bookingId, req.user.id, action, reason || null, nowStr]);
+    try {
+      await query(`
+        INSERT INTO approvals (booking_id, approver_id, status, reason, approved_at)
+        VALUES (?, ?, ?, ?, ?)
+      `, [bookingId, req.user.id, action, reason || null, nowStr]);
+    } catch (appErr) {
+      if (appErr.message && (appErr.message.includes('truncated') || appErr.message.includes('enum'))) {
+        try { await query("ALTER TABLE approvals MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending';"); } catch (e) {}
+        await query(`
+          INSERT INTO approvals (booking_id, approver_id, status, reason, approved_at)
+          VALUES (?, ?, ?, ?, ?)
+        `, [bookingId, req.user.id, action, reason || null, nowStr]);
+      } else {
+        throw appErr;
+      }
+    }
 
     if (bk.requester_email) {
       sendApprovalStatusUpdate(bk.requester_email, bk, action, reason).catch(e => console.error('[Email Error]', e.message));
