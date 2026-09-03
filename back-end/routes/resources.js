@@ -214,7 +214,7 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
     available_after,
     active_booking,
     upcoming_booking,
-    has_pending_request: !!currentPending
+    has_pending_request: !!pendingBk
   };
 }
 
