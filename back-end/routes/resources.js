@@ -24,7 +24,7 @@ const isAuthorizedForResource = async (user, resourceId) => {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { type, category, minCapacity, location, department, search } = req.query;
-    let sql = 'SELECT * FROM resources WHERE is_active = 1';
+    let sql = 'SELECT * FROM resources WHERE (is_active = 1 OR is_active IS NULL)';
     const params = [];
 
     if (type && type !== 'all') {
@@ -65,9 +65,9 @@ router.get('/', authenticateToken, async (req, res) => {
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    // Staff / Dept Head department restriction if resource is specifically restricted
-    if (req.user.role === 'staff') {
-      sql += ' AND (department_restriction IS NULL OR department_restriction = ?)';
+    // Staff department restriction check (only restrict if explicitly assigned to another specific department)
+    if (req.user && req.user.role === 'staff' && req.user.department) {
+      sql += ' AND (department_restriction IS NULL OR department_restriction = "" OR department_restriction = ?)';
       params.push(req.user.department);
     }
 

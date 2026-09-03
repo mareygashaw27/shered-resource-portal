@@ -397,35 +397,48 @@ async function seedInitialData() {
       ('System Auditor', 'auditor.system2026@gmail.com', 'auditor123', 'auditor', 'Internal Audit')
     `);
 
-    // Seed Resources
-    const features1 = JSON.stringify(['Projector', 'Whiteboard', 'Video Conferencing', 'WiFi']);
-    const features2 = JSON.stringify(['GPS', 'Automatic Transmission', 'Dashcam', 'Air Conditioning']);
-    const features3 = JSON.stringify(['High-spec PCs', 'Smartboard', 'Dual Monitors']);
-
-    await query(`INSERT INTO resources (resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, department_restriction, image_url) VALUES
-      ('CH-101', 'Executive Conference Room A', 'conference_hall', 'Conference Halls', 16, 'Building A - Floor 3', '${features1}', '08:00', '18:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'),
-      ('TL-102', 'Innovation Lab 2', 'training_lab', 'Training Labs', 25, 'Building B - Floor 1', '${features3}', '08:00', '20:00', 1, 1, 'IT Department', 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80'),
-      ('MR-103', 'Huddle Pod B', 'meeting_room', 'Meeting Rooms', 6, 'Building A - Floor 2', '${features1}', '08:00', '18:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'),
-      ('VH-201', 'Toyota RAV4 SUV (Fleet #1)', 'vehicle', 'SUVs', 5, 'Parking Bay 4B', '${features2}', '06:00', '22:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80'),
-      ('VH-202', 'Honda Civic Sedan (Fleet #2)', 'vehicle', 'Sedan Vehicles', 5, 'Parking Bay 2A', '${features2}', '07:00', '19:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&w=800&q=80'),
-      ('EQ-301', 'Portable 4K Projector & Screen', 'equipment', 'Presentation Gear', 1, 'IT Storage Rm 104', '${JSON.stringify(['HDMI', 'Wireless Screen Share'])}', '08:00', '18:00', 1, 0, NULL, 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80')
-    `);
-    await query('UPDATE resources SET requires_approval = 1');
-    await seedSampleBookings();
+    // Check resources count independently so resources are guaranteed to exist
+    const resCount = (await query('SELECT COUNT(*) as count FROM resources'))[0].count;
+    if (resCount === 0) {
+      console.log('[DB] Seeding default resources...');
+      await query(`INSERT INTO resources (resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, is_active, department_restriction, image_url) VALUES
+        ('CH-101', 'Executive Conference Room A', 'conference_hall', 'Conference Halls', 16, 'Building A - Floor 3', '${features1}', '08:00', '18:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'),
+        ('TL-102', 'Innovation Lab 2', 'training_lab', 'Training Labs', 25, 'Building B - Floor 1', '${features3}', '08:00', '20:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80'),
+        ('MR-103', 'Huddle Pod B', 'meeting_room', 'Meeting Rooms', 6, 'Building A - Floor 2', '${features1}', '08:00', '18:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'),
+        ('VH-201', 'Toyota RAV4 SUV (Fleet #1)', 'vehicle', 'SUVs', 5, 'Parking Bay 4B', '${features2}', '06:00', '22:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80'),
+        ('VH-202', 'Honda Civic Sedan (Fleet #2)', 'vehicle', 'Sedan Vehicles', 5, 'Parking Bay 2A', '${features2}', '07:00', '19:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&w=800&q=80'),
+        ('EQ-301', 'Portable 4K Projector & Screen', 'equipment', 'Presentation Gear', 1, 'IT Storage Rm 104', '${JSON.stringify(['HDMI', 'Wireless Screen Share'])}', '08:00', '18:00', 1, 0, 1, NULL, 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80')
+      `);
+    }
   } else {
     try {
       await query("DELETE FROM users WHERE email LIKE '%@organization.org'");
       await query("INSERT INTO users (name, email, password, role, department) VALUES ('Marey Gashaw', 'mareygashaw21@gmail.com', 'mar2121@', 'super_admin', 'Executive Office') ON DUPLICATE KEY UPDATE password = 'mar2121@', role = 'super_admin'");
     } catch(e) {}
-    await query('UPDATE resources SET requires_approval = 1');
-    await seedSampleBookings();
+    
+    // Also check resources count for existing MySQL installations
+    const resCount = (await query('SELECT COUNT(*) as count FROM resources'))[0].count;
+    if (resCount === 0) {
+      console.log('[DB] Seeding default resources for existing DB...');
+      const features1 = JSON.stringify(['Projector', 'Whiteboard', 'Video Conferencing', 'WiFi']);
+      const features2 = JSON.stringify(['GPS', 'Automatic Transmission', 'Dashcam', 'Air Conditioning']);
+      const features3 = JSON.stringify(['High-spec PCs', 'Smartboard', 'Dual Monitors']);
+      await query(`INSERT INTO resources (resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, is_active, department_restriction, image_url) VALUES
+        ('CH-101', 'Executive Conference Room A', 'conference_hall', 'Conference Halls', 16, 'Building A - Floor 3', '${features1}', '08:00', '18:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'),
+        ('TL-102', 'Innovation Lab 2', 'training_lab', 'Training Labs', 25, 'Building B - Floor 1', '${features3}', '08:00', '20:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80'),
+        ('MR-103', 'Huddle Pod B', 'meeting_room', 'Meeting Rooms', 6, 'Building A - Floor 2', '${features1}', '08:00', '18:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'),
+        ('VH-201', 'Toyota RAV4 SUV (Fleet #1)', 'vehicle', 'SUVs', 5, 'Parking Bay 4B', '${features2}', '06:00', '22:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80'),
+        ('VH-202', 'Honda Civic Sedan (Fleet #2)', 'vehicle', 'Sedan Vehicles', 5, 'Parking Bay 2A', '${features2}', '07:00', '19:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&w=800&q=80'),
+        ('EQ-301', 'Portable 4K Projector & Screen', 'equipment', 'Presentation Gear', 1, 'IT Storage Rm 104', '${JSON.stringify(['HDMI', 'Wireless Screen Share'])}', '08:00', '18:00', 1, 0, 1, NULL, 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80')
+      `);
+    }
   }
 }
 
 function seedSQLiteInitialData() {
-  const row = sqliteDb.prepare('SELECT COUNT(*) as count FROM users').get();
-  if (row.count === 0) {
-    console.log('[DB SQLite] Seeding initial users and resources...');
+  const userRow = sqliteDb.prepare('SELECT COUNT(*) as count FROM users').get();
+  if (userRow.count === 0) {
+    console.log('[DB SQLite] Seeding initial users...');
     sqliteDb.exec(`
       INSERT INTO users (name, email, password, role, department) VALUES 
       ('Marey Gashaw', 'mareygashaw21@gmail.com', 'mar2121@', 'super_admin', 'Executive Office'),
@@ -437,26 +450,27 @@ function seedSQLiteInitialData() {
       ('Equipment Dept Head', 'head.equipments@gmail.com', 'head123', 'department_head', 'Equipment Department'),
       ('Staff Member', 'staff.member2026@gmail.com', 'staff123', 'staff', 'IT Department'),
       ('System Auditor', 'auditor.system2026@gmail.com', 'auditor123', 'auditor', 'Internal Audit');
+    `);
+  }
 
-      INSERT INTO resources (resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, department_restriction, image_url) VALUES
-      ('CH-101', 'Executive Conference Room A', 'conference_hall', 'Conference Halls', 16, 'Building A - Floor 3', '["Projector", "Whiteboard", "Video Conferencing", "WiFi"]', '08:00', '18:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'),
-      ('TL-102', 'Innovation Lab 2', 'training_lab', 'Training Labs', 25, 'Building B - Floor 1', '["High-spec PCs", "Smartboard", "Dual Monitors"]', '08:00', '20:00', 1, 1, 'IT Department', 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80'),
-      ('MR-103', 'Huddle Pod B', 'meeting_room', 'Meeting Rooms', 6, 'Building A - Floor 2', '["Projector", "Whiteboard", "WiFi"]', '08:00', '18:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'),
-      ('VH-201', 'Toyota RAV4 SUV (Fleet #1)', 'vehicle', 'SUVs', 5, 'Parking Bay 4B', '["GPS", "Automatic Transmission", "Dashcam", "Air Conditioning"]', '06:00', '22:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80'),
-      ('VH-202', 'Honda Civic Sedan (Fleet #2)', 'vehicle', 'Sedan Vehicles', 5, 'Parking Bay 2A', '["GPS", "Automatic Transmission", "Air Conditioning"]', '07:00', '19:00', 1, 1, NULL, 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&w=800&q=80'),
-      ('EQ-301', 'Portable 4K Projector & Screen', 'equipment', 'Presentation Gear', 1, 'IT Storage Rm 104', '["HDMI", "Wireless Screen Share"]', '08:00', '18:00', 1, 0, NULL, 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80');
+  // Ensure resources table is populated independently
+  const resRow = sqliteDb.prepare('SELECT COUNT(*) as count FROM resources').get();
+  if (resRow.count === 0) {
+    console.log('[DB SQLite] Seeding initial resources...');
+    sqliteDb.exec(`
+      INSERT INTO resources (resource_uuid, name, type, category, capacity, location, features, operating_hours_start, operating_hours_end, requires_approval, requires_checkin, is_active, department_restriction, image_url) VALUES
+      ('CH-101', 'Executive Conference Room A', 'conference_hall', 'Conference Halls', 16, 'Building A - Floor 3', '["Projector", "Whiteboard", "Video Conferencing", "WiFi"]', '08:00', '18:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80'),
+      ('TL-102', 'Innovation Lab 2', 'training_lab', 'Training Labs', 25, 'Building B - Floor 1', '["High-spec PCs", "Smartboard", "Dual Monitors"]', '08:00', '20:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80'),
+      ('MR-103', 'Huddle Pod B', 'meeting_room', 'Meeting Rooms', 6, 'Building A - Floor 2', '["Projector", "Whiteboard", "WiFi"]', '08:00', '18:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'),
+      ('VH-201', 'Toyota RAV4 SUV (Fleet #1)', 'vehicle', 'SUVs', 5, 'Parking Bay 4B', '["GPS", "Automatic Transmission", "Dashcam", "Air Conditioning"]', '06:00', '22:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80'),
+      ('VH-202', 'Honda Civic Sedan (Fleet #2)', 'vehicle', 'Sedan Vehicles', 5, 'Parking Bay 2A', '["GPS", "Automatic Transmission", "Air Conditioning"]', '07:00', '19:00', 1, 1, 1, NULL, 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&w=800&q=80'),
+      ('EQ-301', 'Portable 4K Projector & Screen', 'equipment', 'Presentation Gear', 1, 'IT Storage Rm 104', '["HDMI", "Wireless Screen Share"]', '08:00', '18:00', 1, 0, 1, NULL, 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80');
     `);
   }
   
-  // Wipe all old test bookings to guarantee 100% clean initial state
+  // Ensure default resource flags and types are standardized WITHOUT wiping existing bookings
   sqliteDb.exec(`
-    DELETE FROM check_ins;
-    DELETE FROM feedback;
-    DELETE FROM approvals;
-    DELETE FROM bookings;
-    DELETE FROM resource_availability_exceptions;
-
-    UPDATE resources SET requires_approval = 1;
+    UPDATE resources SET is_active = 1 WHERE is_active IS NULL;
     UPDATE resources SET type = 'conference_hall' WHERE type = 'room' AND (name LIKE '%Conference%' OR category LIKE '%Conference%');
     UPDATE resources SET type = 'meeting_room' WHERE type = 'room';
     UPDATE resources SET type = 'training_lab' WHERE type = 'lab';

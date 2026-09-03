@@ -139,10 +139,12 @@ export default function AdminManagement() {
       image_url: normalizeImageUrl(imageUrl) || null
     };
     try {
+      const token = sessionStorage.getItem('shered_res_token');
       const res = await fetch(`${API_BASE_URL}/api/resources`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
           'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
           'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin'
         },
@@ -180,10 +182,12 @@ export default function AdminManagement() {
   const handleScheduleBlock = async (e) => {
     e.preventDefault();
     try {
+      const token = sessionStorage.getItem('shered_res_token');
       const res = await fetch(`${API_BASE_URL}/api/resources/${showBlockModal}/block`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
           'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
           'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin'
         },
@@ -257,9 +261,11 @@ export default function AdminManagement() {
   const handleDeleteResource = async (id, rName) => {
     if (!window.confirm(`Are you sure you want to delete resource "${rName}"?`)) return;
     try {
+      const token = sessionStorage.getItem('shered_res_token');
       const res = await fetch(`${API_BASE_URL}/api/resources/${id}`, {
         method: 'DELETE',
         headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
           'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
           'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin'
         }
