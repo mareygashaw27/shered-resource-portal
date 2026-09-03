@@ -1,5 +1,10 @@
 const nodemailer = require('nodemailer');
 const os = require('os');
+const dns = require('dns');
+
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 let transporter = null;
 
@@ -26,6 +31,7 @@ async function getTransporter() {
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
+      family: 4, // Force IPv4 to prevent ENETUNREACH on cloud environments like Render
       auth: {
         user: cleanUser,
         pass: cleanPass

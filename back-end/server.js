@@ -1,3 +1,8 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const systemPort = process.env.PORT;
 require('dotenv').config();
 const express = require('express');
