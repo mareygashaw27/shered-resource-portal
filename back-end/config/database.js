@@ -512,6 +512,10 @@ async function ensureDefaultUsersAndRoles() {
   }
 }
 
+async function seedSampleBookings() {
+  // Do not seed sample bookings — keep bookings empty per user request
+}
+
 module.exports = {
   initDatabase,
   query,
