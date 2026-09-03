@@ -343,6 +343,9 @@ async function createMySQLTables() {
   try {
     await pool.query('ALTER TABLE resources MODIFY image_url LONGTEXT;');
   } catch (e) {}
+  try {
+    await pool.query("ALTER TABLE check_ins MODIFY COLUMN check_in_method VARCHAR(50) DEFAULT 'web';");
+  } catch (e) {}
 }
 
 function createSQLiteTables() {

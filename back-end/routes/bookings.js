@@ -406,7 +406,7 @@ router.get('/quick-checkin', async (req, res) => {
     const nowStr = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
 
     if (!isAlreadyCheckedIn) {
-      await query(`INSERT INTO check_ins (booking_id, checked_in_at, check_in_method) VALUES (?, ?, 'qr_mobile')`,
+      await query(`INSERT INTO check_ins (booking_id, checked_in_at, check_in_method) VALUES (?, ?, 'qr')`,
         [bk.id, nowStr]);
 
       await query(`INSERT INTO audit_logs (user_id, action, booking_id, details) VALUES (?, 'MOBILE_QR_CHECK_IN', ?, ?)`,
