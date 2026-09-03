@@ -23,6 +23,9 @@ async function getTransporter() {
     console.log(`[Email Service] Initializing Gmail App Password transporter for ${emailUser}`);
     transporter = nodemailer.createTransport({
       service: 'gmail',
+      connectionTimeout: 4000,
+      greetingTimeout: 4000,
+      socketTimeout: 4000,
       auth: {
         user: emailUser,
         pass: emailPass

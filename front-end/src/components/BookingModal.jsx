@@ -10,8 +10,7 @@ export default function BookingModal({ resource, initialStartTime, onClose, onSu
   const { user, usersList } = useAuth();
   const { t } = useLanguage();
 
-  const leadMinutes = (resource?.min_lead_time_minutes && resource.min_lead_time_minutes > 0) ? resource.min_lead_time_minutes + 5 : 65;
-  const defaultStart = initialStartTime ? new Date(initialStartTime) : new Date(Date.now() + leadMinutes * 60 * 1000);
+  const defaultStart = initialStartTime ? new Date(initialStartTime) : new Date();
   const defaultEnd = addHours(defaultStart, 1);
 
   const [title, setTitle] = useState('');

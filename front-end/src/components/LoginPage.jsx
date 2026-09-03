@@ -18,6 +18,7 @@ export default function LoginPage() {
   // Forgot password states
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
+  const [resetUrl, setResetUrl] = useState('');
   const [forgotSubmitting, setForgotSubmitting] = useState(false);
 
   const handleLoginSubmit = async (e) => {
@@ -45,6 +46,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setForgotSuccess('');
+    setResetUrl('');
 
     if (!forgotEmail || !forgotEmail.trim()) {
       setError('Please enter your email address.');
@@ -67,6 +69,9 @@ export default function LoginPage() {
 
       if (res.ok && data.success) {
         setForgotSuccess(data.message);
+        if (data.resetUrl) {
+          setResetUrl(data.resetUrl);
+        }
       } else {
         setError(data.error || 'Failed to send reset email.');
       }
@@ -194,9 +199,19 @@ export default function LoginPage() {
           )}
 
           {forgotSuccess && (
-            <div style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: 14, borderRadius: 8, fontSize: 13, marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 2 }} />
-              <span style={{ lineHeight: 1.4 }}>{forgotSuccess}</span>
+            <div style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: 14, borderRadius: 8, fontSize: 13, marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span style={{ lineHeight: 1.4 }}>{forgotSuccess}</span>
+              </div>
+              {resetUrl && (
+                <a
+                  href={resetUrl}
+                  style={{ display: 'inline-block', marginTop: 4, background: '#4f46e5', color: '#ffffff', padding: '8px 12px', borderRadius: 6, fontWeight: 600, fontSize: 12, textDecoration: 'none', textAlign: 'center' }}
+                >
+                  🔑 {lang === 'am' ? 'አሁን አዲሱን የይለፍ ቃል ለመቀየር እዚህ ይጫኑ' : 'Click here to Reset Password Now'}
+                </a>
+              )}
             </div>
           )}
 

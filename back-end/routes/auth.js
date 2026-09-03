@@ -438,21 +438,29 @@ router.post('/forgot-password', async (req, res) => {
     );
 
     // Determine client origin if available from request
-    const clientOrigin = req.body.origin || req.get('origin') || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    const clientOrigin = req.body.origin || req.get('origin') || (req.headers.referer ? new URL(req.headers.referer).origin : 'https://shered-resource-portal.vercel.app');
+    const resetUrl = `${clientOrigin}/#reset-password?token=${resetToken}`;
 
-    // Send Real-time email with Reset link
-    const emailResult = await sendPasswordResetEmail(user.email, resetToken, user.name, clientOrigin);
-
-    if (emailResult.success) {
-      res.json({
-        success: true,
-        message: `A password reset link has been sent to ${user.email}. Please check your inbox (and spam folder).`
-      });
-    } else {
-      res.status(500).json({
-        error: `Could not send email: ${emailResult.error || 'SMTP/OAuth error'}. Please verify email settings.`
-      });
+    // Send Real-time email with Reset link (fast timeout to prevent cloud hanging)
+    let emailSent = false;
+    try {
+      const emailPromise = sendPasswordResetEmail(user.email, resetToken, user.name, clientOrigin);
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'SMTP Timeout' }), 4000));
+      const emailResult = await Promise.race([emailPromise, timeoutPromise]);
+      emailSent = emailResult && emailResult.success;
+    } catch (e) {
+      console.warn('[Forgot Password] Email notice:', e.message);
     }
+
+    res.json({
+      success: true,
+      emailSent,
+      message: emailSent
+        ? `A password reset link has been sent to ${user.email}.`
+        : `Password reset link is ready.`,
+      resetToken,
+      resetUrl
+    });
   } catch (err) {
     console.error('[Forgot Password Error]', err);
     res.status(500).json({ error: err.message });

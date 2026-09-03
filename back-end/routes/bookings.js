@@ -234,28 +234,19 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const reqStart = new Date(start_datetime);
     const reqEnd = new Date(end_datetime);
-    const now = new Date();
 
-    // 2. Validate Lead Time
-    const leadTimeMin = differenceInMinutes(reqStart, now);
-    if (leadTimeMin < (resource.min_lead_time_minutes || 0)) {
-      return res.status(400).json({
-        error: `Minimum booking lead time is ${resource.min_lead_time_minutes} minutes in advance.`
-      });
+    if (isNaN(reqStart.getTime()) || isNaN(reqEnd.getTime())) {
+      return res.status(400).json({ error: 'Please provide valid start and end dates/times.' });
     }
 
-    // 3. Validate Max Duration
-    const durationMin = differenceInMinutes(reqEnd, reqStart);
-    if (durationMin > (resource.max_duration_minutes || 240)) {
-      return res.status(400).json({
-        error: `Maximum booking duration is ${resource.max_duration_minutes / 60} hours.`
-      });
+    if (reqEnd <= reqStart) {
+      return res.status(400).json({ error: 'End time must be after start time.' });
     }
 
-    // 4. Validate Capacity
-    if (attendees && attendees > resource.capacity) {
+    // Capacity check
+    if (attendees && attendees > resource.capacity && resource.capacity > 0) {
       return res.status(400).json({
-        error: `Requested attendees (${attendees}) exceeds maximum resource capacity (${resource.capacity}).`
+        error: `Requested attendees (${attendees}) exceeds resource capacity (${resource.capacity}).`
       });
     }
 
