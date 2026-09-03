@@ -192,7 +192,7 @@ async function sendEmail({ to, subject, html, text }) {
     if (RESEND_API_KEY) {
       console.log(`[Email Service] Dispatching email via Resend HTTPS API to ${to}...`);
       const resendResult = await sendViaResendHttps(RESEND_API_KEY, {
-        from: 'Shared Resource Portal <onboarding@resend.dev>',
+        from: 'Shared Resource Scheduling Portal <onboarding@resend.dev>',
         to: Array.isArray(to) ? to : [to],
         subject,
         html,
