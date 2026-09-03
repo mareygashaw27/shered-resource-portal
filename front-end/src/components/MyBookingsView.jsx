@@ -284,17 +284,16 @@ export default function MyBookingsView() {
                     <td>{new Date(bk.end_datetime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
                     <td>
                       <span className={`badge badge-${
-                        bk.status === 'confirmed' ? 'available' : 
-                        (bk.status === 'pending' ? 'pending' : 
-                        (bk.status === 'on_hold' ? 'pending' : 
-                        (bk.status === 'rejected' ? 'booked' : 'maintenance')))
+                        (bk.status === 'confirmed' || bk.status === 'checked_in') ? 'booked' : 
+                        (bk.status === 'pending' || bk.status === 'on_hold' ? 'pending' : 
+                        (bk.status === 'rejected' || bk.status === 'cancelled' ? 'maintenance' : 'available'))
                       }`} style={{
-                        background: bk.status === 'rejected' ? 'var(--danger-light)' : (bk.status === 'on_hold' ? '#fef3c7' : undefined),
-                        color: bk.status === 'rejected' ? 'var(--danger)' : (bk.status === 'on_hold' ? '#d97706' : undefined),
-                        border: bk.status === 'rejected' ? '1px solid var(--danger)' : (bk.status === 'on_hold' ? '1px solid #f59e0b' : undefined),
+                        background: (bk.status === 'confirmed' || bk.status === 'checked_in') ? '#fef2f2' : (bk.status === 'pending' ? '#fffbeb' : (bk.status === 'on_hold' ? '#fef3c7' : '#f1f5f9')),
+                        color: (bk.status === 'confirmed' || bk.status === 'checked_in') ? '#991b1b' : (bk.status === 'pending' ? '#92400e' : (bk.status === 'on_hold' ? '#d97706' : '#475569')),
+                        border: `1px solid ${(bk.status === 'confirmed' || bk.status === 'checked_in') ? '#fecaca' : (bk.status === 'pending' ? '#fde68a' : (bk.status === 'on_hold' ? '#f59e0b' : '#cbd5e1'))}`,
                         fontWeight: 700
                       }}>
-                        {bk.status === 'on_hold' ? 'ON HOLD' : bk.status.toUpperCase()}
+                        {bk.status === 'on_hold' ? 'ON HOLD' : (bk.status === 'confirmed' ? 'BOOKED' : bk.status.toUpperCase())}
                       </span>
 
                       {bk.approver_name && (

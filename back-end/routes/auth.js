@@ -528,6 +528,10 @@ router.post('/reset-password', async (req, res) => {
       [newPassword.trim(), user.id]
     );
 
+    if (req.io) {
+      req.io.emit('user_updated', { userId: user.id, email: user.email, name: user.name });
+    }
+
     res.json({
       success: true,
       message: 'Your password has been successfully updated! You can now log in with your new password.'

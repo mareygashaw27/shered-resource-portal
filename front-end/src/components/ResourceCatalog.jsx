@@ -165,6 +165,25 @@ export default function ResourceCatalog({ onSelectResource }) {
     }
   };
 
+  const formatRemainingTime = (dtStr) => {
+    if (!dtStr) return '';
+    try {
+      const diffMs = new Date(dtStr).getTime() - Date.now();
+      if (diffMs <= 0) return '';
+      const diffMins = Math.ceil(diffMs / (60 * 1000));
+      if (diffMins < 60) {
+        return lang === 'am' ? `(ከ ${diffMins} ደቂቃ በኋላ)` : `(in ${diffMins} min)`;
+      }
+      const hrs = Math.floor(diffMins / 60);
+      const mins = diffMins % 60;
+      return lang === 'am'
+        ? `(ከ ${hrs} ሰዓት ${mins > 0 ? mins + ' ደቂቃ ' : ''}በኋላ)`
+        : `(in ${hrs}h ${mins > 0 ? mins + 'm' : ''})`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const types = [
     { key: 'all', labelKey: 'allResources' },
     { key: 'meeting_room', labelKey: 'meetingRooms' },
@@ -463,8 +482,8 @@ export default function ResourceCatalog({ onSelectResource }) {
                     <span>
                       {r.available_after
                         ? (lang === 'am'
-                            ? `ተይዟል • ከ ${formatTimeOnly(r.available_after)} በኋላ ክፍት ይሆናል`
-                            : `Booked • Available after ${formatTimeOnly(r.available_after)}`)
+                            ? `ተይዟል • ከ ${formatTimeOnly(r.available_after)} ${formatRemainingTime(r.available_after)} በኋላ ክፍት ይሆናል`
+                            : `Booked • Available after ${formatTimeOnly(r.available_after)} ${formatRemainingTime(r.available_after)}`)
                         : (lang === 'am' ? 'በአሁኑ ሰዓት ተይዟል (In Use)' : 'Currently in use')}
                     </span>
                   </div>

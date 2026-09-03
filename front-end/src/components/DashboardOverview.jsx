@@ -200,7 +200,11 @@ export default function DashboardOverview({ onOpenBookModal, onSwitchTab }) {
                       {new Date(bk.start_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(bk.end_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
                     <td>
-                      <span className={`badge badge-${bk.status === 'confirmed' ? 'available' : (bk.status === 'pending' ? 'pending' : 'booked')}`}>
+                      <span className={`badge badge-${
+                        (bk.status === 'confirmed' || bk.status === 'checked_in') ? 'booked' : 
+                        (bk.status === 'pending' || bk.status === 'on_hold' ? 'pending' : 
+                        (bk.status === 'cancelled' || bk.status === 'rejected' ? 'maintenance' : 'available'))
+                      }`}>
                         {bk.status.toUpperCase()}
                       </span>
                     </td>
