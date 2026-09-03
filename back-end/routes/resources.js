@@ -75,13 +75,13 @@ router.get('/', authenticateToken, async (req, res) => {
     sql += ' ORDER BY id ASC';
     const resources = await query(sql, params);
 
-    // Fetch active & pending bookings to determine 3-color status
+    // Fetch active & pending bookings to determine 4-color status (Green, Red, Yellow, Gray)
     const allBookings = await query(`
       SELECT b.id, b.resource_id, b.booking_ref, b.title, b.start_datetime, b.end_datetime, b.status, 
              u.name as user_name, u.department as user_department
       FROM bookings b
-      JOIN users u ON b.user_id = u.id
-      WHERE b.status IN ('confirmed', 'pending')
+      LEFT JOIN users u ON b.user_id = u.id
+      WHERE b.status IN ('confirmed', 'checked_in', 'pending', 'on_hold')
       ORDER BY b.start_datetime ASC
     `);
 
@@ -99,7 +99,8 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Helper to determine real-time status (Green = available, Yellow = pending, Red = in_use)
+// Helper to determine real-time status:
+// Green = available, Red = in_use/booked, Yellow = pending approval, Gray = maintenance/disabled
 function parseIsoDate(str) {
   if (!str) return null;
   if (str instanceof Date) return str;
@@ -120,28 +121,31 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
   const rBookings = (allBookings || []).filter(b => b.resource_id === r.id);
   const rBlocks = (allBlocks || []).filter(b => b.resource_id === r.id);
 
-  // 1. Maintenance block (GRAY)
+  // 1. Maintenance block active right now or disabled resource (GRAY)
   const activeBlock = rBlocks.find(m => {
     const s = parseIsoDate(m.start_time);
     const e = parseIsoDate(m.end_time);
-    return s && e && (now < e);
+    return s && e && (now >= s && now <= e);
   });
 
-  // 2. Confirmed / In-use booking (RED — Booked)
-  const confirmedBk = rBookings.find(b => {
+  const isMaintenanceOrDisabled = activeBlock || r.is_active === 0 || r.status === 'maintenance' || r.status === 'disabled';
+
+  // 2. Confirmed / In-use booking happening RIGHT NOW (RED — Booked)
+  const inUseBk = rBookings.find(b => {
     if (!['confirmed', 'checked_in'].includes(b.status)) return false;
+    const s = parseIsoDate(b.start_datetime);
     const e = parseIsoDate(b.end_datetime);
-    return e && e > now;
+    return s && e && (s <= now && e > now);
   });
 
-  // 3. Pending booking (YELLOW — Pending Approval)
+  // 3. Pending booking waiting for approval (YELLOW — Pending Approval)
   const pendingBk = rBookings.find(b => {
-    if (b.status !== 'pending') return false;
+    if (!['pending', 'on_hold'].includes(b.status)) return false;
     const e = parseIsoDate(b.end_datetime);
     return e && e > now;
   });
 
-  // 4. Next upcoming booking
+  // 4. Next upcoming booking (for display info)
   const upcomingBooking = rBookings
     .filter(b => {
       if (!['confirmed', 'checked_in', 'pending'].includes(b.status)) return false;
@@ -150,36 +154,36 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
     })
     .sort((a, b) => parseIsoDate(a.start_datetime) - parseIsoDate(b.start_datetime))[0] || null;
 
-  let current_status = 'available'; // Green
+  let current_status = 'available'; // Green: Available
   let available_after = null;
   let active_booking = null;
   let upcoming_booking = null;
 
-  if (activeBlock || r.is_active === 0 || r.status === 'maintenance' || r.status === 'disabled') {
-    current_status = 'maintenance'; // Gray
+  if (isMaintenanceOrDisabled) {
+    current_status = 'maintenance'; // Gray: Maintenance/Disabled
     available_after = activeBlock ? activeBlock.end_time : null;
     active_booking = {
-      title: (activeBlock && activeBlock.reason) || 'Scheduled Maintenance',
+      title: (activeBlock && activeBlock.reason) || (r.status === 'disabled' ? 'Resource Disabled' : 'Scheduled Maintenance'),
       user_name: 'Maintenance Team',
       start_datetime: activeBlock ? activeBlock.start_time : null,
       end_datetime: activeBlock ? activeBlock.end_time : null,
       status: 'maintenance'
     };
-  } else if (confirmedBk) {
-    current_status = 'in_use'; // Red — Booked
-    available_after = confirmedBk.end_datetime;
+  } else if (inUseBk) {
+    current_status = 'in_use'; // Red: Booked
+    available_after = inUseBk.end_datetime;
     active_booking = {
-      id: confirmedBk.id,
-      booking_ref: confirmedBk.booking_ref,
-      title: confirmedBk.title,
-      user_name: confirmedBk.user_name,
-      department: confirmedBk.user_department,
-      start_datetime: confirmedBk.start_datetime,
-      end_datetime: confirmedBk.end_datetime,
-      status: confirmedBk.status || 'confirmed'
+      id: inUseBk.id,
+      booking_ref: inUseBk.booking_ref,
+      title: inUseBk.title,
+      user_name: inUseBk.user_name,
+      department: inUseBk.user_department,
+      start_datetime: inUseBk.start_datetime,
+      end_datetime: inUseBk.end_datetime,
+      status: inUseBk.status || 'confirmed'
     };
   } else if (pendingBk) {
-    current_status = 'pending'; // Yellow — Pending Approval
+    current_status = 'pending'; // Yellow: Pending Approval
     available_after = pendingBk.end_datetime;
     active_booking = {
       id: pendingBk.id,

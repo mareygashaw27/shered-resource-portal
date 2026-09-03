@@ -445,9 +445,12 @@ router.post('/forgot-password', async (req, res) => {
     let emailSent = false;
     try {
       const emailPromise = sendPasswordResetEmail(user.email, resetToken, user.name, clientOrigin);
-      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'SMTP Timeout' }), 4000));
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ success: false, error: 'SMTP Timeout after 12s' }), 12000));
       const emailResult = await Promise.race([emailPromise, timeoutPromise]);
       emailSent = emailResult && emailResult.success;
+      if (!emailSent && emailResult && emailResult.error) {
+        console.warn('[Forgot Password] Email send result:', emailResult.error);
+      }
     } catch (e) {
       console.warn('[Forgot Password] Email notice:', e.message);
     }

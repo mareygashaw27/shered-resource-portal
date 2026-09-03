@@ -3,6 +3,7 @@ const router = express.Router();
 const { query } = require('../config/database');
 const { authenticateToken, checkRole } = require('../middleware/auth');
 const { format } = require('date-fns');
+const { sendApprovalStatusUpdate } = require('../services/emailService');
 
 // Get Pending Approvals (Super Admin, Resource Manager, Dept Head [Dept only])
 router.get('/pending', authenticateToken, checkRole(['super_admin', 'resource_manager', 'department_head']), async (req, res) => {
@@ -16,9 +17,12 @@ router.get('/pending', authenticateToken, checkRole(['super_admin', 'resource_ma
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
       JOIN users u ON b.user_id = u.id
-      LEFT JOIN approvals a ON a.id = (
-        SELECT id FROM approvals WHERE booking_id = b.id ORDER BY id DESC LIMIT 1
-      )
+      LEFT JOIN (
+        SELECT booking_id, MAX(id) AS latest_approval_id
+        FROM approvals
+        GROUP BY booking_id
+      ) latest_ap ON latest_ap.booking_id = b.id
+      LEFT JOIN approvals a ON a.id = latest_ap.latest_approval_id
       WHERE b.status IN ('pending', 'on_hold')
     `;
     const params = [];
@@ -54,8 +58,6 @@ router.get('/pending', authenticateToken, checkRole(['super_admin', 'resource_ma
     res.status(500).json({ error: err.message });
   }
 });
-
-const { sendApprovalStatusUpdate } = require('../services/emailService');
 
 // Action on Approval (Approve / Reject / Hold FR-034)
 router.post('/action', authenticateToken, checkRole(['super_admin', 'resource_manager', 'department_head']), async (req, res) => {

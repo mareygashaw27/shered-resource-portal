@@ -11,7 +11,7 @@ import { API_BASE_URL } from '../config';
 
 export default function CalendarView({ onSelectSlot }) {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { socket } = useSocket();
   const [viewMode, setViewMode] = useState('daily'); // 'daily', 'weekly', 'monthly'
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -142,28 +142,45 @@ export default function CalendarView({ onSelectSlot }) {
   const monthGridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const monthDays = eachDayOfInterval({ start: monthGridStart, end: monthGridEnd });
 
+  const parseSafeDate = (val) => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    const s = String(val).replace(' ', 'T');
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? new Date(val) : d;
+  };
+
   // Helper to check slot status for a specific resource & datetime window
   const getSlotStatus = (resourceId, startStr, endStr) => {
-    const s = new Date(startStr);
-    const e = new Date(endStr);
+    const s = parseSafeDate(startStr);
+    const e = parseSafeDate(endStr);
+
+    // 0. Check if resource itself is disabled or set to maintenance (GRAY)
+    const targetRes = resources.find(r => r.id === resourceId);
+    if (targetRes && (targetRes.is_active === 0 || targetRes.status === 'maintenance' || targetRes.status === 'disabled')) {
+      return {
+        type: 'maintenance',
+        label: targetRes.status === 'disabled' ? (lang === 'am' ? 'የተዘጋ' : 'Disabled') : (lang === 'am' ? 'ጥገና ላይ' : 'Maintenance')
+      };
+    }
 
     // 1. Check Maintenance Block (GRAY)
     const blockMatch = blocks.find(b => {
       if (b.resource_id !== resourceId) return false;
-      const bStart = new Date(b.start_time);
-      const bEnd = new Date(b.end_time);
+      const bStart = parseSafeDate(b.start_time);
+      const bEnd = parseSafeDate(b.end_time);
       return (s < bEnd && e > bStart);
     });
     if (blockMatch) {
-      return { type: 'maintenance', label: blockMatch.reason || 'Maintenance', data: blockMatch };
+      return { type: 'maintenance', label: blockMatch.reason || (lang === 'am' ? 'ጥገና ላይ' : 'Maintenance'), data: blockMatch };
     }
 
-    // 2. Check Bookings (RED for confirmed/checked_in, YELLOW for pending)
+    // 2. Check Bookings (RED for confirmed/checked_in, YELLOW for pending/on_hold)
     const bkMatch = bookings.find(b => {
       if (b.resource_id !== resourceId) return false;
       if (['cancelled', 'rejected', 'no_show'].includes(b.status)) return false;
-      const bStart = new Date(b.start_datetime);
-      const bEnd = new Date(b.end_datetime);
+      const bStart = parseSafeDate(b.start_datetime);
+      const bEnd = parseSafeDate(b.end_datetime);
       return (s < bEnd && e > bStart);
     });
 
@@ -178,7 +195,7 @@ export default function CalendarView({ onSelectSlot }) {
     }
 
     // 3. Free (GREEN)
-    return { type: 'available', label: t('available') || 'Available' };
+    return { type: 'available', label: t('available') || (lang === 'am' ? 'ክፍት' : 'Available') };
   };
 
   // Helper to calculate daily summary for a date across resources
@@ -190,11 +207,20 @@ export default function CalendarView({ onSelectSlot }) {
     let availableCount = 0;
 
     filteredResources.forEach(r => {
+      // Check if resource is disabled or maintenance
+      if (r.is_active === 0 || r.status === 'maintenance' || r.status === 'disabled') {
+        maintenanceCount++;
+        return;
+      }
+
       // Check if resource has maintenance block on this date
       const hasBlock = blocks.some(b => {
         if (b.resource_id !== r.id) return false;
-        const bStartStr = format(new Date(b.start_time), 'yyyy-MM-dd');
-        const bEndStr = format(new Date(b.end_time), 'yyyy-MM-dd');
+        const bStart = parseSafeDate(b.start_time);
+        const bEnd = parseSafeDate(b.end_time);
+        if (!bStart || !bEnd) return false;
+        const bStartStr = format(bStart, 'yyyy-MM-dd');
+        const bEndStr = format(bEnd, 'yyyy-MM-dd');
         return dayStr >= bStartStr && dayStr <= bEndStr;
       });
 
@@ -207,8 +233,11 @@ export default function CalendarView({ onSelectSlot }) {
       const dayBookings = bookings.filter(b => {
         if (b.resource_id !== r.id) return false;
         if (['cancelled', 'rejected', 'no_show'].includes(b.status)) return false;
-        const bStartStr = format(new Date(b.start_datetime), 'yyyy-MM-dd');
-        const bEndStr = format(new Date(b.end_datetime), 'yyyy-MM-dd');
+        const bStart = parseSafeDate(b.start_datetime);
+        const bEnd = parseSafeDate(b.end_datetime);
+        if (!bStart || !bEnd) return false;
+        const bStartStr = format(bStart, 'yyyy-MM-dd');
+        const bEndStr = format(bEnd, 'yyyy-MM-dd');
         return dayStr >= bStartStr && dayStr <= bEndStr;
       });
 
@@ -409,12 +438,28 @@ export default function CalendarView({ onSelectSlot }) {
                     {weekDays.map(day => {
                       const dayStr = format(day, 'yyyy-MM-dd');
 
+                      // Check if resource is itself disabled or maintenance
+                      const isResourceDisabled = r.is_active === 0 || r.status === 'maintenance' || r.status === 'disabled';
+
                       // Day status for this resource
-                      const hasBlock = blocks.some(b => b.resource_id === r.id && format(new Date(b.start_time), 'yyyy-MM-dd') <= dayStr && format(new Date(b.end_time), 'yyyy-MM-dd') >= dayStr);
-                      const dayBookings = bookings.filter(b => b.resource_id === r.id && !['cancelled', 'rejected', 'no_show'].includes(b.status) && format(new Date(b.start_datetime), 'yyyy-MM-dd') <= dayStr && format(new Date(b.end_datetime), 'yyyy-MM-dd') >= dayStr);
+                      const hasBlock = !isResourceDisabled && blocks.some(b => {
+                        if (b.resource_id !== r.id) return false;
+                        const bStart = parseSafeDate(b.start_time);
+                        const bEnd = parseSafeDate(b.end_time);
+                        if (!bStart || !bEnd) return false;
+                        return format(bStart, 'yyyy-MM-dd') <= dayStr && format(bEnd, 'yyyy-MM-dd') >= dayStr;
+                      });
+                      const dayBookings = isResourceDisabled || hasBlock ? [] : bookings.filter(b => {
+                        if (b.resource_id !== r.id) return false;
+                        if (['cancelled', 'rejected', 'no_show'].includes(b.status)) return false;
+                        const bStart = parseSafeDate(b.start_datetime);
+                        const bEnd = parseSafeDate(b.end_datetime);
+                        if (!bStart || !bEnd) return false;
+                        return format(bStart, 'yyyy-MM-dd') <= dayStr && format(bEnd, 'yyyy-MM-dd') >= dayStr;
+                      });
 
                       const confirmedBks = dayBookings.filter(b => b.status === 'confirmed' || b.status === 'checked_in');
-                      const pendingBks = dayBookings.filter(b => b.status === 'pending');
+                      const pendingBks = dayBookings.filter(b => b.status === 'pending' || b.status === 'on_hold');
 
                       return (
                         <td
@@ -432,21 +477,25 @@ export default function CalendarView({ onSelectSlot }) {
                           }}
                           title="Click to view daily hour grid"
                         >
-                          {hasBlock ? (
+                          {isResourceDisabled ? (
                             <div style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 6, padding: 6, fontSize: 11, fontWeight: 600 }}>
-                              🩶 Maintenance
+                              🩶 {lang === 'am' ? 'ጥገና/ዝጋ' : 'Disabled'}
+                            </div>
+                          ) : hasBlock ? (
+                            <div style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 6, padding: 6, fontSize: 11, fontWeight: 600 }}>
+                              🩶 {lang === 'am' ? 'ጥገና ላይ' : 'Maintenance'}
                             </div>
                           ) : confirmedBks.length > 0 ? (
                             <div style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: 6, padding: 6, fontSize: 11, fontWeight: 600 }}>
-                              🔴 {confirmedBks.length} Booked
+                              🔴 {confirmedBks.length} {lang === 'am' ? 'ተይዟል' : 'Booked'}
                             </div>
                           ) : pendingBks.length > 0 ? (
                             <div style={{ background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', borderRadius: 6, padding: 6, fontSize: 11, fontWeight: 600 }}>
-                              🟡 {pendingBks.length} Pending
+                              🟡 {pendingBks.length} {lang === 'am' ? 'ማጽደቅ ይጠብቃል' : 'Pending'}
                             </div>
                           ) : (
                             <div style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: 6, padding: 6, fontSize: 11, fontWeight: 600 }}>
-                              🟢 Available
+                              🟢 {lang === 'am' ? 'ክፍት' : 'Available'}
                             </div>
                           )}
                         </td>

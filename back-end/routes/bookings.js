@@ -18,8 +18,8 @@ router.get('/', authenticateToken, async (req, res) => {
              u.department as user_department
       FROM bookings b
       JOIN resources r ON b.resource_id = r.id
-      JOIN users u ON b.user_id = u.id
-      WHERE b.status IN ('confirmed', 'pending', 'on_hold')
+      LEFT JOIN users u ON b.user_id = u.id
+      WHERE b.status IN ('confirmed', 'checked_in', 'pending', 'on_hold')
     `;
     const params = [];
 
@@ -119,9 +119,12 @@ router.get('/my', authenticateToken, async (req, res) => {
       LEFT JOIN users u ON b.user_id = u.id
       LEFT JOIN check_ins c ON b.id = c.booking_id
       LEFT JOIN feedback f ON b.id = f.booking_id
-      LEFT JOIN approvals a ON a.id = (
-        SELECT id FROM approvals WHERE booking_id = b.id ORDER BY id DESC LIMIT 1
-      )
+      LEFT JOIN (
+        SELECT booking_id, MAX(id) AS latest_approval_id
+        FROM approvals
+        GROUP BY booking_id
+      ) latest_ap ON latest_ap.booking_id = b.id
+      LEFT JOIN approvals a ON a.id = latest_ap.latest_approval_id
       LEFT JOIN users ap_u ON a.approver_id = ap_u.id
       WHERE b.status NOT IN ('cancelled', 'no_show')
         AND (r.is_active = 1 OR r.is_active IS NULL)

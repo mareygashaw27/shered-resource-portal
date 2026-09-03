@@ -19,14 +19,17 @@ async function getTransporter() {
   const smtpPass = process.env.SMTP_PASS;
 
   if (emailUser && emailPass) {
-    console.log(`[Email Service] Initializing live Gmail SSL transporter for ${emailUser}`);
+    const cleanPass = String(emailPass).trim().replace(/\s+/g, '');
+    const cleanUser = String(emailUser).trim();
+    console.log(`[Email Service] Initializing live Gmail SSL transporter for ${cleanUser}`);
     transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true, // SSL
+      service: 'gmail',
       auth: {
-        user: emailUser,
-        pass: emailPass
+        user: cleanUser,
+        pass: cleanPass
+      },
+      tls: {
+        rejectUnauthorized: false
       }
     });
   } else if (emailUser && clientId && clientSecret && refreshToken) {
