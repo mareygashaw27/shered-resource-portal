@@ -74,6 +74,9 @@ export default function LoginPage() {
         }
       } else {
         setError(data.error || 'Failed to send reset email.');
+        if (data.resetUrl) {
+          setResetUrl(data.resetUrl);
+        }
       }
     } catch (err) {
       setForgotSubmitting(false);
@@ -192,9 +195,32 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="login-error-box" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
+            <div className="login-error-box" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                <span>{error}</span>
+              </div>
+              {resetUrl && (
+                <div style={{ marginTop: 6, paddingTop: 8, borderTop: '1px solid rgba(220,38,38,0.2)' }}>
+                  <a 
+                    href={resetUrl}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      padding: '7px 14px',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      fontSize: 12.5
+                    }}
+                  >
+                    {lang === 'am' ? 'እዚህ በመጫን የይለፍ ቃልዎን በቀጥታ ይቀይሩ ➔' : 'Click here to reset password directly ➔'}
+                  </a>
+                </div>
+              )}
             </div>
           )}
 

@@ -7,7 +7,7 @@ if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder('ipv4first');
 }
 
-// Load from env or decoded fallback
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbxxNF90OWg9G6vluYdbGoGsWvdkmtczSC44c1tCme8iRo7NN6wP0vTgQoWhE755s9t3/exec';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || Buffer.from('cmVfNWQ2bzYyRjZfMzE3eGtTTHpYQkMydTZCSlVrN3RYU0VS', 'base64').toString('utf-8');
 
 let transporter = null;
@@ -122,6 +122,33 @@ function sendViaResendHttps(apiKey, payload) {
   });
 }
 
+function sendViaGoogleScript(url, payload) {
+  return new Promise((resolve) => {
+    try {
+      if (typeof fetch !== 'undefined') {
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          redirect: 'follow'
+        })
+        .then(async (res) => {
+          const body = await res.text();
+          let parsed = {};
+          try { parsed = JSON.parse(body); } catch (e) { parsed = { success: res.ok }; }
+          resolve({ success: res.ok && parsed.success !== false, data: parsed });
+        })
+        .catch(err => resolve({ success: false, error: err.message }));
+      } else {
+        // Fallback for older environments
+        resolve({ success: false, error: 'fetch not available' });
+      }
+    } catch (e) {
+      resolve({ success: false, error: e.message });
+    }
+  });
+}
+
 /**
  * Generic email dispatcher with guaranteed immediate console & API output
  */
@@ -132,7 +159,36 @@ async function sendEmail({ to, subject, html, text }) {
       return { success: false, error: 'Recipient email missing' };
     }
 
-    // 1. Send via Resend HTTPS (Port 443 - NEVER blocked by Render or Cloud firewalls)
+    const recipient = Array.isArray(to) ? to.join(',') : to;
+
+    // 1. Primary Dispatcher: Google Apps Script Webhook (Sends from mareygashaw21@gmail.com to ANY real email address!)
+    if (GOOGLE_SCRIPT_URL) {
+      console.log(`[Email Service] Dispatching email via Gmail Webhook to ${recipient}...`);
+      const gasResult = await sendViaGoogleScript(GOOGLE_SCRIPT_URL, {
+        to: recipient,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]+>/g, '')
+      });
+
+      if (gasResult.success) {
+        console.log(`\n=======================================================`);
+        console.log(`📧 [EMAIL SENT SUCCESSFULLY VIA GMAIL WEBHOOK]`);
+        console.log(`📩 To: ${recipient}`);
+        console.log(`📌 Subject: ${subject}`);
+        console.log(`=======================================================\n`);
+        return {
+          success: true,
+          to: recipient,
+          subject,
+          summary: `Email delivered via Gmail Webhook to ${recipient}`
+        };
+      } else {
+        console.warn('[Gmail Webhook Notice] Webhook returned:', gasResult.error);
+      }
+    }
+
+    // 2. Secondary Dispatcher: Resend HTTPS (for mareygashaw21@gmail.com)
     if (RESEND_API_KEY) {
       console.log(`[Email Service] Dispatching email via Resend HTTPS API to ${to}...`);
       const resendResult = await sendViaResendHttps(RESEND_API_KEY, {
@@ -159,20 +215,39 @@ async function sendEmail({ to, subject, html, text }) {
         };
       } else {
         console.warn('[Resend API Notice] Resend returned:', resendResult.error);
+        // If Resend rejected because of domain restriction, don't hide it
+        if (String(resendResult.error).includes('only send testing emails')) {
+          return {
+            success: false,
+            error: `በ Resend Free ህግ መሰረት ኢሜይል መላክ የሚቻለው ወደ ተመዘገበው ዋና ኢሜይል (mareygashaw21@gmail.com) ብቻ ነው። ለሌላ ኢሜይል ለመላክ በ Resend ላይ Domain ማረጋገጥ ያስፈልጋል።`
+          };
+        }
       }
     }
 
     // 2. Fallback to SMTP
-    const transport = await getTransporter();
-    const mailOptions = {
-      from: DEFAULT_FROM,
-      to,
-      subject,
-      text: text || html.replace(/<[^>]+>/g, ''),
-      html
-    };
+    try {
+      const transport = await getTransporter();
+      const mailOptions = {
+        from: DEFAULT_FROM,
+        to,
+        subject,
+        text: text || html.replace(/<[^>]+>/g, ''),
+        html
+      };
 
-    const info = await transport.sendMail(mailOptions);
+      const info = await transport.sendMail(mailOptions);
+      return {
+        success: true,
+        messageId: info.messageId || `msg-${Date.now()}`,
+        to,
+        subject,
+        summary: `Email sent to ${to} with subject "${subject}"`
+      };
+    } catch (smtpErr) {
+      console.error('[SMTP Fallback Error]', smtpErr.message);
+      return { success: false, error: smtpErr.message };
+    }
 
     console.log(`\n=======================================================`);
     console.log(`📧 [EMAIL SENT SUCCESSFULLY]`);
