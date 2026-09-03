@@ -1,3 +1,4 @@
+const systemPort = process.env.PORT;
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -88,7 +89,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+// Prioritize cloud host environment PORT (e.g. Render port 10000) over local default
+const PORT = systemPort || process.env.PORT || 5000;
 
 async function startServer() {
   await initDatabase();
