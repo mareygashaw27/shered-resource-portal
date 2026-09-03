@@ -398,13 +398,21 @@ router.put('/users/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Delete User Endpoint (Super Admin only)
+// Delete User Endpoint (Super Admin only - Protected against deleting admin)
 router.delete('/users/:id', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'super_admin') {
       return res.status(403).json({ error: 'Access denied: only Super Admin can delete users' });
     }
     const { id } = req.params;
+    const targetUsers = await query('SELECT id, name, email, role FROM users WHERE id = ?', [id]);
+    if (targetUsers.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const target = targetUsers[0];
+    if (target.role === 'super_admin' || target.email?.toLowerCase().includes('mareygashaw21@gmail.com')) {
+      return res.status(403).json({ error: 'Admin accounts cannot be deleted. You can only edit them.' });
+    }
     await query('DELETE FROM users WHERE id = ?', [id]);
     res.json({ message: 'User deleted successfully' });
   } catch (err) {

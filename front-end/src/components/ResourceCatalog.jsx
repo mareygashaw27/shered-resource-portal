@@ -73,22 +73,15 @@ export default function ResourceCatalog({ onSelectResource }) {
       if (res.ok) {
         const data = await res.json();
         const now = new Date();
-
         const enriched = data.map(r => {
-          // If backend already computed current_status, use it directly
-          if (r.current_status) return r;
+          // If backend already marked it in_use, pending or maintenance, keep it
+          if (r.current_status && r.current_status !== 'available') return r;
 
-          // Fallback: compute status from live bookings data
-          const rBookings = bkData.filter(b => b.resource_id === r.id);
+          // Compute status from live bookings data (bkData)
+          const rBookings = bkData.filter(b => String(b.resource_id) === String(r.id));
 
-          // Currently in use RIGHT NOW (confirmed/checked_in booking overlapping now)
+          // Currently in use or confirmed booking that hasn't finished
           const inUse = rBookings.find(b =>
-            (b.status === 'confirmed' || b.status === 'checked_in') &&
-            new Date(b.start_datetime) <= now &&
-            new Date(b.end_datetime) > now
-          );
-
-          const confirmedUpcoming = rBookings.find(b =>
             (b.status === 'confirmed' || b.status === 'checked_in') &&
             new Date(b.end_datetime) > now
           );
@@ -107,7 +100,15 @@ export default function ResourceCatalog({ onSelectResource }) {
             )
             .sort((a, b) => new Date(a.start_datetime) - new Date(b.start_datetime))[0] || null;
 
-          if (inUse) {
+          if (r.status === 'maintenance' || r.is_blocked) {
+            return {
+              ...r,
+              current_status: 'maintenance',
+              available_after: null,
+              upcoming_booking: upcoming,
+              has_pending_request: false
+            };
+          } else if (inUse) {
             return {
               ...r,
               current_status: 'in_use',
@@ -124,15 +125,6 @@ export default function ResourceCatalog({ onSelectResource }) {
               active_booking: pending,
               upcoming_booking: upcoming,
               has_pending_request: true
-            };
-          } else if (confirmedUpcoming) {
-            return {
-              ...r,
-              current_status: 'in_use',
-              available_after: confirmedUpcoming.end_datetime,
-              active_booking: confirmedUpcoming,
-              upcoming_booking: upcoming,
-              has_pending_request: !!pending
             };
           } else {
             return {

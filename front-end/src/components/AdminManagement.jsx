@@ -349,6 +349,14 @@ export default function AdminManagement() {
   const [editingUser, setEditingUser] = useState(null);
 
   const handleDeleteUser = async (userId, userName) => {
+    const targetUser = usersList.find(u => u.id === userId);
+    if (targetUser && (targetUser.role === 'super_admin' || targetUser.email?.toLowerCase().includes('mareygashaw21@gmail.com'))) {
+      setUserMsg({
+        type: 'error',
+        text: lang === 'am' ? 'የአድሚን (Super Admin) አካውንት ሊሰረዝ አይችልም፤ ማስተካከል (Edit) ብቻ ነው የሚቻለው።' : 'Admin accounts cannot be deleted. You can only edit them.'
+      });
+      return;
+    }
     if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) return;
     try {
       const token = sessionStorage.getItem('shered_res_token');
@@ -636,7 +644,7 @@ export default function AdminManagement() {
                       >
                         <Edit size={12} /> Edit
                       </button>
-                      {u.id !== 1 && (
+                      {u.role !== 'super_admin' && !u.email?.toLowerCase().includes('mareygashaw21@gmail.com') && (
                         <button
                           className="btn btn-secondary"
                           style={{ fontSize: 11, padding: '4px 8px', color: 'var(--danger)' }}

@@ -118,8 +118,8 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
   }
 
   const now = new Date();
-  const rBookings = (allBookings || []).filter(b => b.resource_id === r.id);
-  const rBlocks = (allBlocks || []).filter(b => b.resource_id === r.id);
+  const rBookings = (allBookings || []).filter(b => String(b.resource_id) === String(r.id));
+  const rBlocks = (allBlocks || []).filter(b => String(b.resource_id) === String(r.id));
 
   // 1. Maintenance block active right now or disabled resource (GRAY)
   const activeBlock = rBlocks.find(m => {
@@ -130,12 +130,11 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
 
   const isMaintenanceOrDisabled = activeBlock || r.is_active === 0 || r.status === 'maintenance' || r.status === 'disabled';
 
-  // 2. Confirmed / In-use booking happening RIGHT NOW (RED — Booked)
+  // 2. Confirmed / In-use booking (RED — Booked)
   const inUseBk = rBookings.find(b => {
     if (!['confirmed', 'checked_in'].includes(b.status)) return false;
-    const s = parseIsoDate(b.start_datetime);
     const e = parseIsoDate(b.end_datetime);
-    return s && e && (s <= now && e > now);
+    return e && e > now;
   });
 
   // 3. Pending booking waiting for approval (YELLOW — Pending Approval)

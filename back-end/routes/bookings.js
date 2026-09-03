@@ -343,6 +343,7 @@ router.post('/', authenticateToken, async (req, res) => {
       message: notifMsg,
       timestamp: new Date(),
       userId: targetUserId,   // the person the booking is for
+      userEmail: user.email,
       forRoles: ['super_admin', 'resource_manager']  // admins see all
     });
 
@@ -421,6 +422,7 @@ router.get('/quick-checkin', async (req, res) => {
           message: `Booking "${bk.title}" (${bk.booking_ref}) checked in successfully via mobile QR scan.`,
           timestamp: new Date(),
           userId: bk.user_id,
+          userEmail: bk.user_email,
           forRoles: ['super_admin', 'resource_manager']
         });
       }
@@ -871,6 +873,7 @@ router.patch('/:id/extend', authenticateToken, async (req, res) => {
       message: `Booking "${bk.title}" extended by ${minutes} min — now ends at ${newEndStr}.`,
       timestamp: new Date(),
       userId: bk.user_id,
+      userEmail: bk.user_email,
       forRoles: ['super_admin', 'resource_manager']
     });
 

@@ -10,6 +10,33 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [notifications, setNotifications] = useState([]);
 
+  // Load notifications specifically for the current logged-in user
+  useEffect(() => {
+    if (!user || !user.id) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const saved = localStorage.getItem(`shered_res_notifs_${user.id}`);
+      if (saved) {
+        setNotifications(JSON.parse(saved));
+      } else {
+        setNotifications([]);
+      }
+    } catch (e) {
+      setNotifications([]);
+    }
+  }, [user?.id]);
+
+  // Persist notifications specifically for the current user
+  useEffect(() => {
+    if (user && user.id) {
+      try {
+        localStorage.setItem(`shered_res_notifs_${user.id}`, JSON.stringify(notifications));
+      } catch (e) {}
+    }
+  }, [notifications, user?.id]);
+
   useEffect(() => {
     const newSocket = io(API_BASE_URL);
     setSocket(newSocket);
@@ -30,31 +57,24 @@ export const SocketProvider = ({ children }) => {
     return () => newSocket.close();
   }, []);
 
-  // Filter notifications according to RBAC role requirements:
+  // Strict notification filtering:
   // - Super Admin ('super_admin') & Resource Manager ('resource_manager'): see ALL notifications
-  // - Other roles (staff, department_head, auditor): see ONLY notifications addressed to them
+  // - ALL OTHER USERS: ONLY see notifications that belong strictly to them (their own bookings/actions)
   const filteredNotifications = notifications.filter(n => {
     if (!user) return false;
     const role = user.role;
-    // Resource Manager and Super Admin see all notifications
+
+    // Super Admin and Resource Manager see all notifications
     if (role === 'super_admin' || role === 'resource_manager') {
       return true;
     }
-    // Specific targeted user by userId
-    if (n.userId && n.userId === user.id) {
-      return true;
-    }
-    // Targeted by role
-    if (n.forRoles && Array.isArray(n.forRoles) && n.forRoles.includes(role)) {
-      // department_head: also match by department if specified
-      if (role === 'department_head' && n.department) {
-        return n.department === user.department;
-      }
-      return true;
-    }
-    // General broadcasts with no targeting: only admins/managers see these
-    // (staff, dept_head, auditor do NOT see untagged broadcasts)
-    return false;
+
+    // All other users ONLY see their own notifications
+    const matchesUserId = n.userId && String(n.userId) === String(user.id);
+    const matchesTargetUserId = n.targetUserId && String(n.targetUserId) === String(user.id);
+    const matchesEmail = n.userEmail && user.email && String(n.userEmail).toLowerCase() === String(user.email).toLowerCase();
+
+    return Boolean(matchesUserId || matchesTargetUserId || matchesEmail);
   });
 
   const unreadCount = filteredNotifications.filter(n => !n.read).length;

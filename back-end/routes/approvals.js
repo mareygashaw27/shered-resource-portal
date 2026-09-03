@@ -113,6 +113,7 @@ router.post('/action', authenticateToken, checkRole(['super_admin', 'resource_ma
       message: notifMsg,
       timestamp: new Date(),
       userId: bk.user_id,         // the staff/dept-head who made the booking
+      userEmail: bk.requester_email,
       forRoles: ['super_admin', 'resource_manager']  // admins always see it too
     });
 
