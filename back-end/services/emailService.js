@@ -7,7 +7,8 @@ let transporter = null;
 async function getTransporter() {
   if (transporter) return transporter;
 
-  const emailUser = process.env.EMAIL_USER;
+  const emailUser = process.env.EMAIL_USER || 'mareygashaw21@gmail.com';
+  const emailPass = process.env.EMAIL_PASS || 'dcdcwjqkkxinvdal';
   const clientId = process.env.OAUTH_CLIENT_ID;
   const clientSecret = process.env.OAUTH_CLIENT_SECRET;
   const refreshToken = process.env.OAUTH_REFRESH_TOKEN;
@@ -16,9 +17,6 @@ async function getTransporter() {
   const smtpPort = process.env.SMTP_PORT || 587;
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
-
-  const emailUser = process.env.EMAIL_USER || 'mareygashaw21@gmail.com';
-  const emailPass = process.env.EMAIL_PASS || 'dcdcwjqkkxinvdal';
 
   if (emailUser && emailPass) {
     console.log(`[Email Service] Initializing live Gmail SSL transporter for ${emailUser}`);
