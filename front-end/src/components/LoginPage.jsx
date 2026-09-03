@@ -107,7 +107,7 @@ export default function LoginPage() {
               style={{ width: 64, height: 64, objectFit: 'contain', borderRadius: '50%', background: '#fff', padding: 3, boxShadow: '0 8px 24px rgba(0,0,0,0.25)', flexShrink: 0 }} 
             />
             <div>
-              <h1 className="login-left-title">Shared Resource Portal</h1>
+              <h1 className="login-left-title">Shared Resource Scheduling Portal</h1>
               <p className="login-left-subtitle">
                 {lang === 'am' ? 'የወሎ ዩኒቨርሲቲ የጋራ ሀብቶች ማዕከላዊ ቦታ ማስያዣ ሲስተም' : 'Wollo University Resource Booking & Management System'}
               </p>
@@ -318,7 +318,7 @@ export default function LoginPage() {
 
           {/* Bottom text */}
           <p className="login-form-footer-text">
-            © 2026 Shared Resource Portal • Developed by 3rd Year Team
+            © 2026 Shared Resource Scheduling Portal • Developed by 3rd Year Team
           </p>
         </div>
       </div>
