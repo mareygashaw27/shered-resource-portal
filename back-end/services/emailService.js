@@ -17,15 +17,15 @@ async function getTransporter() {
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
 
-  const emailPass = process.env.EMAIL_PASS;
+  const emailUser = process.env.EMAIL_USER || 'mareygashaw21@gmail.com';
+  const emailPass = process.env.EMAIL_PASS || 'dcdcwjqkkxinvdal';
 
   if (emailUser && emailPass) {
-    console.log(`[Email Service] Initializing Gmail App Password transporter for ${emailUser}`);
+    console.log(`[Email Service] Initializing live Gmail SSL transporter for ${emailUser}`);
     transporter = nodemailer.createTransport({
-      service: 'gmail',
-      connectionTimeout: 4000,
-      greetingTimeout: 4000,
-      socketTimeout: 4000,
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // SSL
       auth: {
         user: emailUser,
         pass: emailPass

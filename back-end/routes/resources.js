@@ -120,30 +120,28 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
   const rBookings = (allBookings || []).filter(b => b.resource_id === r.id);
   const rBlocks = (allBlocks || []).filter(b => b.resource_id === r.id);
 
-  // 1. Maintenance block overlapping NOW (GRAY)
+  // 1. Maintenance block (GRAY)
   const activeBlock = rBlocks.find(m => {
     const s = parseIsoDate(m.start_time);
     const e = parseIsoDate(m.end_time);
-    return s && e && now >= s && now < e;
+    return s && e && (now < e);
   });
 
-  // 2. Confirmed/checked-in booking happening RIGHT NOW (RED — in use)
-  const currentInUse = rBookings.find(b => {
+  // 2. Confirmed / In-use booking (RED — Booked)
+  const confirmedBk = rBookings.find(b => {
     if (!['confirmed', 'checked_in'].includes(b.status)) return false;
-    const s = parseIsoDate(b.start_datetime);
     const e = parseIsoDate(b.end_datetime);
-    return s && e && (now >= s && now < e);
+    return e && e > now;
   });
 
-  // 3. Pending booking happening RIGHT NOW (YELLOW — waiting approval)
-  const currentPending = rBookings.find(b => {
+  // 3. Pending booking (YELLOW — Pending Approval)
+  const pendingBk = rBookings.find(b => {
     if (b.status !== 'pending') return false;
-    const s = parseIsoDate(b.start_datetime);
     const e = parseIsoDate(b.end_datetime);
-    return s && e && (now >= s && now < e);
+    return e && e > now;
   });
 
-  // 4. Next upcoming booking in the future (starts after now)
+  // 4. Next upcoming booking
   const upcomingBooking = rBookings
     .filter(b => {
       if (!['confirmed', 'checked_in', 'pending'].includes(b.status)) return false;
@@ -167,30 +165,30 @@ function enrichResourceStatus(r, allBookings = [], allBlocks = []) {
       end_datetime: activeBlock ? activeBlock.end_time : null,
       status: 'maintenance'
     };
-  } else if (currentInUse) {
-    current_status = 'in_use'; // Red — confirmed booking happening RIGHT NOW
-    available_after = currentInUse.end_datetime;
+  } else if (confirmedBk) {
+    current_status = 'in_use'; // Red — Booked
+    available_after = confirmedBk.end_datetime;
     active_booking = {
-      id: currentInUse.id,
-      booking_ref: currentInUse.booking_ref,
-      title: currentInUse.title,
-      user_name: currentInUse.user_name,
-      department: currentInUse.user_department,
-      start_datetime: currentInUse.start_datetime,
-      end_datetime: currentInUse.end_datetime,
-      status: currentInUse.status || 'confirmed'
+      id: confirmedBk.id,
+      booking_ref: confirmedBk.booking_ref,
+      title: confirmedBk.title,
+      user_name: confirmedBk.user_name,
+      department: confirmedBk.user_department,
+      start_datetime: confirmedBk.start_datetime,
+      end_datetime: confirmedBk.end_datetime,
+      status: confirmedBk.status || 'confirmed'
     };
-  } else if (currentPending) {
-    current_status = 'pending'; // Yellow — pending approval request
-    available_after = currentPending.end_datetime;
+  } else if (pendingBk) {
+    current_status = 'pending'; // Yellow — Pending Approval
+    available_after = pendingBk.end_datetime;
     active_booking = {
-      id: currentPending.id,
-      booking_ref: currentPending.booking_ref,
-      title: currentPending.title,
-      user_name: currentPending.user_name,
-      department: currentPending.user_department,
-      start_datetime: currentPending.start_datetime,
-      end_datetime: currentPending.end_datetime,
+      id: pendingBk.id,
+      booking_ref: pendingBk.booking_ref,
+      title: pendingBk.title,
+      user_name: pendingBk.user_name,
+      department: pendingBk.user_department,
+      start_datetime: pendingBk.start_datetime,
+      end_datetime: pendingBk.end_datetime,
       status: 'pending'
     };
   }
