@@ -9,12 +9,12 @@ async function checkResourceAvailability(resourceId, startDateTime, endDateTime,
   const startStr = typeof startDateTime === 'string' ? startDateTime : format(startDateTime, 'yyyy-MM-dd HH:mm:ss');
   const endStr = typeof endDateTime === 'string' ? endDateTime : format(endDateTime, 'yyyy-MM-dd HH:mm:ss');
 
-  // Check existing confirmed/pending bookings
+  // Check existing confirmed/pending/checked_in/on_hold bookings
   let sqlBookings = `
     SELECT id, title, start_datetime, end_datetime, status 
     FROM bookings 
     WHERE resource_id = ? 
-      AND status IN ('confirmed', 'pending')
+      AND status IN ('confirmed', 'pending', 'checked_in', 'on_hold')
       AND (
         (start_datetime < ? AND end_datetime > ?)
       )
@@ -57,7 +57,7 @@ async function checkUserSimultaneousLimit(userId, startDateTime, endDateTime) {
     SELECT COUNT(*) as count 
     FROM bookings 
     WHERE user_id = ? 
-      AND status IN ('confirmed', 'pending')
+      AND status IN ('confirmed', 'pending', 'checked_in', 'on_hold')
       AND (start_datetime < ? AND end_datetime > ?)
   `, [userId, endStr, startStr]);
 

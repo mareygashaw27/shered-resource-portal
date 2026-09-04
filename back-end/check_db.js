@@ -3,15 +3,12 @@ const { query } = require('./config/database');
 async function check() {
   try {
     // Try to get table info
-    console.log("Checking users table structure...");
-    let result;
-    try {
-      result = await query("DESCRIBE users");
-      console.log("MySQL users table structure:", result);
-    } catch (e) {
-      result = await query("PRAGMA table_info(users)");
-      console.log("SQLite users table structure:", result);
-    }
+    const bks = await query("SELECT id, booking_ref, resource_id, title, start_datetime, end_datetime, status FROM bookings");
+    console.log("=== ALL BOOKINGS IN DATABASE ===");
+    console.log(JSON.stringify(bks, null, 2));
+    const res = await query("SELECT id, name, resource_uuid FROM resources WHERE id <= 3");
+    console.log("=== SAMPLE RESOURCES ===");
+    console.log(JSON.stringify(res, null, 2));
   } catch (err) {
     console.error("Error inspecting database:", err);
   }

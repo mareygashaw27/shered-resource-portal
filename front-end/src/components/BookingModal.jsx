@@ -10,12 +10,47 @@ export default function BookingModal({ resource, initialStartTime, onClose, onSu
   const { user, usersList } = useAuth();
   const { t } = useLanguage();
 
-  const defaultStart = initialStartTime ? new Date(initialStartTime) : new Date();
-  const defaultEnd = addHours(defaultStart, 1);
+  // Robust date parser that handles ISO, space-separated MySQL dates, and Date objects safely
+  const parseInputDate = (val) => {
+    if (!val) return new Date();
+    if (val instanceof Date) return isNaN(val.getTime()) ? new Date() : val;
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      const isoStr = str.replace(' ', 'T');
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) return d;
+      const parts = str.match(/\d+/g);
+      if (parts && parts.length >= 3) {
+        return new Date(
+          parseInt(parts[0], 10),
+          parseInt(parts[1], 10) - 1,
+          parseInt(parts[2], 10),
+          parseInt(parts[3] || 0, 10),
+          parseInt(parts[4] || 0, 10),
+          parseInt(parts[5] || 0, 10)
+        );
+      }
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
+  const initialStart = parseInputDate(initialStartTime);
+  const initialEnd = addHours(initialStart, 1);
 
   const [title, setTitle] = useState('');
-  const [startDateTime, setStartDateTime] = useState(format(defaultStart, "yyyy-MM-dd'T'HH:mm"));
-  const [endDateTime, setEndDateTime] = useState(format(defaultEnd, "yyyy-MM-dd'T'HH:mm"));
+  const [startDateTime, setStartDateTime] = useState(format(initialStart, "yyyy-MM-dd'T'HH:mm"));
+  const [endDateTime, setEndDateTime] = useState(format(initialEnd, "yyyy-MM-dd'T'HH:mm"));
+
+  // Keep fields synchronized if initialStartTime changes
+  useEffect(() => {
+    if (initialStartTime) {
+      const s = parseInputDate(initialStartTime);
+      setStartDateTime(format(s, "yyyy-MM-dd'T'HH:mm"));
+      setEndDateTime(format(addHours(s, 1), "yyyy-MM-dd'T'HH:mm"));
+    }
+  }, [initialStartTime]);
+
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrencePattern, setRecurrencePattern] = useState('weekly');
   const [attendees, setAttendees] = useState(1);
@@ -33,11 +68,13 @@ export default function BookingModal({ resource, initialStartTime, onClose, onSu
     setSubmitting(true);
 
     try {
+      const parsedStart = parseInputDate(startDateTime);
+      const parsedEnd = parseInputDate(endDateTime);
       const payload = {
         resource_id: resource.id,
         title,
-        start_datetime: format(new Date(startDateTime), 'yyyy-MM-dd HH:mm:ss'),
-        end_datetime: format(new Date(endDateTime), 'yyyy-MM-dd HH:mm:ss'),
+        start_datetime: format(parsedStart, 'yyyy-MM-dd HH:mm:ss'),
+        end_datetime: format(parsedEnd, 'yyyy-MM-dd HH:mm:ss'),
         is_recurring: isRecurring ? 1 : 0,
         recurrence_pattern: isRecurring ? recurrencePattern : null,
         attendees: parseInt(attendees),
