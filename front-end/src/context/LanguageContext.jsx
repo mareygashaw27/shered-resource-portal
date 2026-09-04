@@ -4,9 +4,9 @@ const LanguageContext = createContext();
 
 const translations = {
   en: {
-    appName: 'Shared Resource Scheduling Portal',
+    appName: 'Shared Resource Scheduling System',
     appSubtitle: 'Wollo University Resource Booking & Management System',
-    loginTitle: 'Sign In to Resource Portal',
+    loginTitle: 'Sign In to Resource Scheduling System',
     loginSubtitle: 'Enter your credentials to access your account',
     selectRole: 'Select Role',
     username: 'Username:',

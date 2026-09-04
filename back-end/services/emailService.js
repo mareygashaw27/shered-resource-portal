@@ -192,7 +192,7 @@ async function sendEmail({ to, subject, html, text }) {
     if (RESEND_API_KEY) {
       console.log(`[Email Service] Dispatching email via Resend HTTPS API to ${to}...`);
       const resendResult = await sendViaResendHttps(RESEND_API_KEY, {
-        from: 'Shared Resource Scheduling Portal <onboarding@resend.dev>',
+        from: 'Shared Resource Scheduling System <onboarding@resend.dev>',
         to: Array.isArray(to) ? to : [to],
         subject,
         html,
@@ -465,7 +465,7 @@ async function sendPasswordResetEmail(userEmail, resetToken, userName, clientOri
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
       <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #f1f5f9;">
         <h2 style="color: #4f46e5; margin: 0; font-size: 22px;">🔐 Password Reset Request</h2>
-        <p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0;">Shared Resource Scheduling Platform</p>
+        <p style="color: #64748b; font-size: 13px; margin: 6px 0 0 0;">Shared Resource Scheduling System</p>
       </div>
       
       <p style="font-size: 15px; color: #334155;">Hello <strong>${userName || 'Valued User'}</strong>,</p>

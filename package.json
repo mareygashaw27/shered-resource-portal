@@ -1,7 +1,7 @@
 {
   "name": "Shered-resource-portal",
   "version": "1.0.0",
-  "description": "Wollo University Shered Resource Portal",
+  "description": "Wollo University Shared Resource Scheduling System",
   "scripts": {
     "dev": "npm --prefix front-end run dev",
     "build": "npm --prefix front-end run build",

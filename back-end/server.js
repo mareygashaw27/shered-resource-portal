@@ -65,7 +65,7 @@ app.use('/api/reports', reportRoutes);
 app.get('/', (req, res) => {
   res.json({
     status: 'online',
-    message: 'Shared Resource Scheduling Engine Backend API is running successfully!',
+    message: 'Shared Resource Scheduling System Backend API is running successfully!',
     health: '/api/health',
     timestamp: new Date()
   });
@@ -73,7 +73,7 @@ app.get('/', (req, res) => {
 
 // Root health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Shared Resource Scheduling Engine API', timestamp: new Date() });
+  res.json({ status: 'ok', service: 'Shared Resource Scheduling System API', timestamp: new Date() });
 });
 
 // Returns the server's local network IP so frontend can build correct QR URLs
@@ -104,7 +104,7 @@ async function startServer() {
   server.listen(PORT, '0.0.0.0', () => {
     const localIP = getLocalIP();
     console.log(`=======================================================`);
-    console.log(`🚀 Shared Resource Scheduling Engine Backend Server`);
+    console.log(`🚀 Shared Resource Scheduling System Backend Server`);
     console.log(`📡 Localhost:  http://localhost:${PORT}`);
     console.log(`📱 Network:    http://${localIP}:${PORT}  ← use this for QR/mobile`);
     console.log(`=======================================================`);

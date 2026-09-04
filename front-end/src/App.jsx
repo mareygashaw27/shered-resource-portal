@@ -169,7 +169,7 @@ function MainAppContent() {
         borderTop: '1px solid var(--border-color, rgba(255,255,255,0.08))',
         marginTop: 'auto'
       }}>
-        © 2026 Shared Resource Scheduling Portal • Developed by 3rd Year Team
+        © 2026 Shared Resource Scheduling System • Developed by 3rd Year Team
       </footer>
     </div>
   );
