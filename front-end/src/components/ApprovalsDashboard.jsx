@@ -23,6 +23,7 @@ export default function ApprovalsDashboard() {
   
   const [holdReasonModal, setHoldReasonModal] = useState(null);
   const [holdReasonInput, setHoldReasonInput] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Status feedback message
   const [feedback, setFeedback] = useState({ type: '', text: '' });
@@ -97,7 +98,7 @@ export default function ApprovalsDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  const [actionLoading, setActionLoading] = useState(false);
+  };
 
   const handleAction = async (bookingId, action, reason = null) => {
     setFeedback({ type: '', text: '' });
