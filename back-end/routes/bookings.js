@@ -73,40 +73,7 @@ router.get('/detail/:id', authenticateToken, async (req, res) => {
 });
 
 router.get('/my', authenticateToken, async (req, res) => {
-
   try {
-    // Automatically purge cancelled, no-show, or inactive resource bookings from DB
-    try {
-      await query(`
-        DELETE FROM check_ins WHERE booking_id IN (
-          SELECT b.id FROM bookings b 
-          LEFT JOIN resources r ON b.resource_id = r.id 
-          WHERE b.status IN ('cancelled', 'no_show') OR r.is_active = 0 OR r.id IS NULL
-        )
-      `);
-      await query(`
-        DELETE FROM approvals WHERE booking_id IN (
-          SELECT b.id FROM bookings b 
-          LEFT JOIN resources r ON b.resource_id = r.id 
-          WHERE b.status IN ('cancelled', 'no_show') OR r.is_active = 0 OR r.id IS NULL
-        )
-      `);
-      await query(`
-        DELETE FROM feedback WHERE booking_id IN (
-          SELECT b.id FROM bookings b 
-          LEFT JOIN resources r ON b.resource_id = r.id 
-          WHERE b.status IN ('cancelled', 'no_show') OR r.is_active = 0 OR r.id IS NULL
-        )
-      `);
-      await query(`
-        DELETE FROM bookings 
-        WHERE status IN ('cancelled', 'no_show') 
-           OR resource_id NOT IN (SELECT id FROM resources WHERE is_active = 1)
-      `);
-    } catch (e) {
-      console.error('[Purge Error]', e.message);
-    }
-
     // Super admin and resource_manager see ALL bookings; others see their own bookings
     let mySql = `
       SELECT b.*, r.name as resource_name, r.location, r.image_url, r.requires_checkin,
@@ -126,8 +93,7 @@ router.get('/my', authenticateToken, async (req, res) => {
       ) latest_ap ON latest_ap.booking_id = b.id
       LEFT JOIN approvals a ON a.id = latest_ap.latest_approval_id
       LEFT JOIN users ap_u ON a.approver_id = ap_u.id
-      WHERE b.status NOT IN ('cancelled', 'no_show')
-        AND (r.is_active = 1 OR r.is_active IS NULL)
+      WHERE (r.is_active = 1 OR r.is_active IS NULL)
     `;
     const myParams = [];
 

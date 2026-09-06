@@ -84,8 +84,13 @@ export default function CheckInModal({ booking, mode, onClose, onSuccess }) {
 
   const targetEmail = booking?.user_email || user?.email || '';
 
-  // Use API_BASE_URL so QR checkin works both locally and in production
-  const quickCheckinUrl = `${API_BASE_URL}/api/bookings/quick-checkin?ref=${encodeURIComponent(booking?.booking_ref || '')}&email=${encodeURIComponent(targetEmail)}`;
+  // For mobile QR scanning, localhost fails on phones (because localhost on a phone points to the phone itself).
+  // Always use the public backend URL so scanning from any mobile phone works seamlessly in both local and deployed environments!
+  const qrBaseUrl = (API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1'))
+    ? 'https://shered-resource-backend.onrender.com'
+    : API_BASE_URL;
+
+  const quickCheckinUrl = `${qrBaseUrl}/api/bookings/quick-checkin?ref=${encodeURIComponent(booking?.booking_ref || '')}&email=${encodeURIComponent(targetEmail)}`;
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(quickCheckinUrl)}&margin=6`;
 
   const getHeaders = () => {

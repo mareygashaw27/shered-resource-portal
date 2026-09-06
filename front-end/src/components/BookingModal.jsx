@@ -115,11 +115,6 @@ export default function BookingModal({ resource, initialStartTime, onClose, onSu
       }
 
       if (!res.ok) {
-        if (data.error && (data.error.includes('suspended') || data.error.includes('no-shows'))) {
-          onSuccess({ message: 'Booking confirmed!' });
-          onClose();
-          return;
-        }
         setErrorMessage(data.error || 'Failed to complete booking.');
         return;
       }

@@ -74,6 +74,36 @@ export default function MyBookingsView() {
 
   }, [socket, user]);
 
+  const parseSafeDate = (val) => {
+    if (!val) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      const isoStr = str.replace(' ', 'T');
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) return d;
+      const parts = str.match(/\d+/g);
+      if (parts && parts.length >= 3) {
+        return new Date(
+          parseInt(parts[0], 10),
+          parseInt(parts[1], 10) - 1,
+          parseInt(parts[2], 10),
+          parseInt(parts[3] || 0, 10),
+          parseInt(parts[4] || 0, 10),
+          parseInt(parts[5] || 0, 10)
+        );
+      }
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const formatDisplayDate = (val) => {
+    const d = parseSafeDate(val);
+    if (!d) return '-';
+    return d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+  };
+
   const fetchMyBookings = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/bookings/my`, {
@@ -81,13 +111,7 @@ export default function MyBookingsView() {
       });
       if (res.ok) {
         const data = await res.json();
-        // Filter to display active upcoming bookings (including pending, confirmed, on_hold, rejected)
-        const activeUpcomingBookings = data.filter(bk => {
-          const isNotPast = new Date(bk.end_datetime) > new Date();
-          const isActiveStatus = ['confirmed', 'pending', 'checked_in', 'rejected', 'on_hold'].includes(bk.status);
-          return isNotPast && isActiveStatus;
-        });
-        setBookings(activeUpcomingBookings);
+        setBookings(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error(err);
@@ -149,8 +173,10 @@ export default function MyBookingsView() {
 
   const openRescheduleModal = (bk) => {
     setRescheduleBooking(bk);
-    setNewStart(format(new Date(bk.start_datetime), "yyyy-MM-dd'T'HH:mm"));
-    setNewEnd(format(new Date(bk.end_datetime), "yyyy-MM-dd'T'HH:mm"));
+    const s = parseSafeDate(bk.start_datetime) || new Date();
+    const e = parseSafeDate(bk.end_datetime) || new Date();
+    setNewStart(format(s, "yyyy-MM-dd'T'HH:mm"));
+    setNewEnd(format(e, "yyyy-MM-dd'T'HH:mm"));
     setRescheduleError('');
   };
 
@@ -280,8 +306,8 @@ export default function MyBookingsView() {
                     <td style={{ fontWeight: 600 }}>{bk.resource_name}</td>
                     <td>{bk.title}</td>
                     {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{bk.user_name || '-'}</td>}
-                    <td>{new Date(bk.start_datetime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td>{new Date(bk.end_datetime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</td>
+                    <td>{formatDisplayDate(bk.start_datetime)}</td>
+                    <td>{formatDisplayDate(bk.end_datetime)}</td>
                     <td>
                       <span className={`badge badge-${
                         (bk.status === 'confirmed' || bk.status === 'checked_in') ? 'booked' : 

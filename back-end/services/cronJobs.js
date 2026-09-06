@@ -33,7 +33,8 @@ async function processNoShowCancellations(io) {
       AND r.requires_checkin = 1
       AND c.id IS NULL
       AND b.start_datetime <= ?
-  `, [fifteenMinutesAgo]);
+      AND (b.created_at IS NULL OR b.created_at <= ?)
+  `, [fifteenMinutesAgo, fifteenMinutesAgo]);
 
   for (const bk of expiredBookings) {
     console.log(`[Cron No-Show] Auto-cancelling booking #${bk.id} (${bk.title}) for user ${bk.user_name} due to missed grace period.`);
