@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { Plus, Wrench, Shield, Check, X, AlertCircle, Users, Layers, UserPlus, Edit, Trash2, Eye, MapPin, Clock, CheckCircle2, ExternalLink, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
+import { format, addHours } from 'date-fns';
 import { getResourceImage, getDefaultResourceImage, normalizeImageUrl } from '../utils/imageUtils';
 import { API_BASE_URL } from '../config';
 
@@ -12,10 +13,12 @@ export default function AdminManagement() {
 
   const [activeTab, setActiveTab] = useState('resources'); // 'resources' | 'users'
   const [resources, setResources] = useState([]);
+  const [blocks, setBlocks] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingResource, setEditingResource] = useState(null);
   const [selectedDetailResource, setSelectedDetailResource] = useState(null);
   const [showBlockModal, setShowBlockModal] = useState(null);
+  const [editingBlockId, setEditingBlockId] = useState(null);
 
   // New Resource Form State
   const [name, setName] = useState('');
@@ -113,69 +116,63 @@ export default function AdminManagement() {
   const fetchResources = async () => {
     try {
       const token = sessionStorage.getItem('shered_res_token');
-      const res = await fetch(`${API_BASE_URL}/api/resources`, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
-          'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin',
-          'x-simulated-dept': loggedInUser?.department || user?.department || 'Executive Office'
-        }
-      });
+      const headers = {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
+        'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin',
+        'x-simulated-dept': loggedInUser?.department || user?.department || 'Executive Office'
+      };
+      const res = await fetch(`${API_BASE_URL}/api/resources`, { headers });
       if (res.ok) {
         const data = await res.json();
         setResources(data);
+      }
+
+      // Also fetch active maintenance blocks
+      const blkRes = await fetch(`${API_BASE_URL}/api/resources/blocks`, { headers });
+      if (blkRes.ok) {
+        const blkData = await blkRes.json();
+        setBlocks(Array.isArray(blkData) ? blkData : []);
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleCreateResource = async (e) => {
-    e.preventDefault();
-    setResourceMsg({ type: '', text: '' });
-    const payload = {
-      name, type, category, capacity: parseInt(capacity),
-      requires_approval: requiresApproval, requires_checkin: requiresCheckin,
-      image_url: normalizeImageUrl(imageUrl) || null
-    };
+  const openNewBlockModal = (r) => {
+    setShowBlockModal(r.id);
+    setEditingBlockId(null);
+    setBlockStart(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+    setBlockEnd(format(addHours(new Date(), 2), "yyyy-MM-dd'T'HH:mm"));
+    setBlockReason('Scheduled Maintenance');
+  };
+
+  const openExtendModal = (r, activeBlock) => {
+    setShowBlockModal(r.id);
+    setEditingBlockId(activeBlock.id);
+    setBlockStart(activeBlock.start_time ? String(activeBlock.start_time).replace(' ', 'T').substring(0, 16) : format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+    setBlockEnd(activeBlock.end_time ? String(activeBlock.end_time).replace(' ', 'T').substring(0, 16) : format(addHours(new Date(), 2), "yyyy-MM-dd'T'HH:mm"));
+    setBlockReason(activeBlock.reason || 'Scheduled Maintenance');
+  };
+
+  const handleUnblockResource = async (resourceId) => {
+    if (!window.confirm(lang === 'am' ? 'የጥገና እገዳውን አንስተው ሪሶርሱን ወዲያውኑ ወደ ክፍት (Available) መመለስ ይፈልጋሉ?' : 'Are you sure you want to lift the maintenance block and restore this resource to Available now?')) return;
     try {
       const token = sessionStorage.getItem('shered_res_token');
-      const res = await fetch(`${API_BASE_URL}/api/resources`, {
-        method: 'POST',
+      const res = await fetch(`${API_BASE_URL}/api/resources/${resourceId}/block`, {
+        method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': token ? `Bearer ${token}` : '',
           'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
           'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin'
-        },
-        body: JSON.stringify(payload)
+        }
       });
-
       if (res.ok) {
-        setShowAddModal(false);
-        setName(''); setType('meeting_room'); setCategory('Meeting Rooms');
-        setCapacity(10); setImageUrl('');
+        setResourceMsg({ type: 'success', text: lang === 'am' ? '✅ የጥገና እገዳው ተነስቷል፤ ሪሶርሱ ወደ Available ተመልሷል።' : '✅ Maintenance block lifted. Resource is now Available!' });
         fetchResources();
-        setResourceMsg({ type: 'success', text: `Resource "${name}" created successfully!` });
-      } else {
-        const err = await res.json();
-        setResourceMsg({ type: 'error', text: err.error || 'Failed to create resource.' });
       }
     } catch (err) {
-      // Offline fallback — add to local state directly
-      const offlineResource = {
-        id: Date.now(),
-        resource_uuid: 'local-' + Date.now(),
-        name, type, category,
-        capacity: parseInt(capacity),
-        requires_approval: requiresApproval,
-        requires_checkin: requiresCheckin,
-        image_url: imageUrl.trim() || null
-      };
-      setShowAddModal(false);
-      setName(''); setType('meeting_room'); setCategory('Meeting Rooms');
-      setCapacity(10); setImageUrl('');
-      setResourceMsg({ type: 'error', text: 'Connection error. Please ensure the server is running.' });
+      console.error(err);
     }
   };
 
@@ -200,7 +197,17 @@ export default function AdminManagement() {
 
       if (res.ok) {
         setShowBlockModal(null);
+        setEditingBlockId(null);
+        setResourceMsg({
+          type: 'success',
+          text: editingBlockId
+            ? (lang === 'am' ? '✅ የጥገና ሰዓቱ በተሳካ ሁኔታ ተራዝሟል/ተስተካክሏል።' : '✅ Maintenance block extended successfully!')
+            : (lang === 'am' ? '✅ የጥገና ሰዓት በተሳካ ሁኔታ ተመድቧል።' : '✅ Maintenance block scheduled successfully!')
+        });
         fetchResources();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to update maintenance block');
       }
     } catch (err) {
       console.error(err);
@@ -544,11 +551,25 @@ export default function AdminManagement() {
               </tr>
             </thead>
             <tbody>
-              {resources.map((r) => (
+              {resources.map((r) => {
+                const isUnderMaintenance = r.current_status === 'maintenance' || r.status === 'maintenance' || blocks.some(b => String(b.resource_id) === String(r.id));
+                const activeBlock = blocks.find(b => String(b.resource_id) === String(r.id)) || (isUnderMaintenance ? {
+                  id: r.id,
+                  resource_id: r.id,
+                  start_time: r.active_booking?.start_datetime,
+                  end_time: r.available_after || r.active_booking?.end_datetime,
+                  reason: r.active_booking?.title || 'Scheduled Maintenance'
+                } : null);
+                return (
                 <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedDetailResource(r)}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)' }}>{r.resource_uuid}</td>
                   <td style={{ fontWeight: 600 }}>
                     <span style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>{r.name}</span>
+                    {activeBlock && (
+                      <span style={{ fontSize: 10, background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', padding: '2px 7px', borderRadius: 4, marginLeft: 8, fontWeight: 700 }}>
+                        ⚪ {lang === 'am' ? 'ጥገና ላይ' : 'Under Maintenance'}
+                      </span>
+                    )}
                   </td>
                   <td style={{ textTransform: 'capitalize' }}>{r.type}</td>
                   <td>{r.category}</td>
@@ -560,7 +581,7 @@ export default function AdminManagement() {
                     </span>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <button
                         className="btn btn-secondary"
                         style={{ fontSize: 11, padding: '4px 8px', color: 'var(--primary)' }}
@@ -579,14 +600,35 @@ export default function AdminManagement() {
                         <Edit size={12} /> Edit
                       </button>
 
-                      <button
-                        className="btn btn-secondary"
-                        style={{ fontSize: 11, padding: '4px 8px' }}
-                        onClick={() => setShowBlockModal(r.id)}
-                        title="Maintenance Block"
-                      >
-                        <Wrench size={12} /> Block
-                      </button>
+                      {activeBlock ? (
+                        <>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: 11, padding: '4px 8px', color: '#16a34a', borderColor: '#86efac', background: '#f0fdf4', fontWeight: 600 }}
+                            onClick={() => handleUnblockResource(r.id)}
+                            title={lang === 'am' ? 'የጥገና እገዳውን አንሳ' : 'Unblock and restore to Available'}
+                          >
+                            <CheckCircle2 size={12} /> {lang === 'am' ? 'እገዳ አንሳ' : 'Unblock'}
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: 11, padding: '4px 8px', color: '#d97706', borderColor: '#fde68a', background: '#fffbeb', fontWeight: 600 }}
+                            onClick={() => openExtendModal(r, activeBlock)}
+                            title={lang === 'am' ? 'የጥገና ሰዓት አራዝም' : 'Extend maintenance time'}
+                          >
+                            <Clock size={12} /> {lang === 'am' ? 'አራዝም' : 'Extend'}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: 11, padding: '4px 8px' }}
+                          onClick={() => openNewBlockModal(r)}
+                          title="Maintenance Block"
+                        >
+                          <Wrench size={12} /> Block
+                        </button>
+                      )}
 
                       <button
                         className="btn btn-secondary"
@@ -599,7 +641,8 @@ export default function AdminManagement() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
@@ -810,8 +853,15 @@ export default function AdminManagement() {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: 460 }}>
             <div className="modal-header">
-              <div className="modal-title">{t('scheduleMaintenanceBlock')}</div>
-              <button className="btn btn-secondary" style={{ padding: 4 }} onClick={() => setShowBlockModal(null)}><X size={18} /></button>
+              <div className="modal-title">
+                {editingBlockId
+                  ? (lang === 'am' ? '⏱️ የጥገና ሰዓት ማራዘሚያ / ማስተካከያ' : '⏱️ Extend / Edit Maintenance Block')
+                  : t('scheduleMaintenanceBlock')
+                }
+              </div>
+              <button className="btn btn-secondary" style={{ padding: 4 }} onClick={() => { setShowBlockModal(null); setEditingBlockId(null); }}>
+                <X size={18} />
+              </button>
             </div>
             <form onSubmit={handleScheduleBlock}>
               <div style={{ marginBottom: 16 }}>
@@ -827,8 +877,13 @@ export default function AdminManagement() {
                 <input type="text" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g. Renovation / Vehicle Servicing" required style={{ width: '100%' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowBlockModal(null)}>{t('cancel')}</button>
-                <button type="submit" className="btn btn-primary">{t('scheduleBlockBtn')}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowBlockModal(null); setEditingBlockId(null); }}>{t('cancel')}</button>
+                <button type="submit" className="btn btn-primary">
+                  {editingBlockId
+                    ? (lang === 'am' ? 'ሰዓት አራዝም' : 'Extend Block')
+                    : t('scheduleBlockBtn')
+                  }
+                </button>
               </div>
             </form>
           </div>

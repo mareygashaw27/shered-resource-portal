@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { query } = require('../config/database');
 const { authenticateToken, checkRole } = require('../middleware/auth');
+const { format } = require('date-fns');
 const { checkResourceAvailability, findNextAvailableSlot, findAlternativeResources, findAdjacentSlots } = require('../services/conflictEngine');
 
 const isAuthorizedForResource = async (user, resourceId) => {
@@ -361,7 +362,15 @@ router.get('/blocks', authenticateToken, async (req, res) => {
   }
 });
 
-// Block Resource for Maintenance (FR-002)
+function formatSqlDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const d = new Date(s.replace(' ', 'T'));
+  if (isNaN(d.getTime())) return s.replace('T', ' ');
+  return format(d, 'yyyy-MM-dd HH:mm:ss');
+}
+
+// Block Resource for Maintenance (FR-002: Schedule or Extend)
 router.post('/:id/block', authenticateToken, checkRole(['super_admin', 'resource_manager', 'department_head']), async (req, res) => {
   try {
     const resourceId = req.params.id;
@@ -370,18 +379,134 @@ router.post('/:id/block', authenticateToken, checkRole(['super_admin', 'resource
       return res.status(403).json({ error: 'Access denied: you do not manage this resource department' });
     }
     const { startTime, endTime, reason, type } = req.body;
+    const startStr = formatSqlDate(startTime);
+    const endStr = formatSqlDate(endTime);
 
-    await query(`
-      INSERT INTO resource_availability_exceptions (resource_id, start_time, end_time, reason, type)
-      VALUES (?, ?, ?, ?, ?)
-    `, [resourceId, startTime, endTime, reason || 'Scheduled Maintenance', type || 'maintenance']);
+    // If a block already exists for this resource, update it so extending/editing always works!
+    const existing = await query('SELECT id FROM resource_availability_exceptions WHERE resource_id = ? ORDER BY id DESC LIMIT 1', [resourceId]);
+    if (existing.length > 0) {
+      await query(`
+        UPDATE resource_availability_exceptions 
+        SET start_time = COALESCE(?, start_time),
+            end_time = COALESCE(?, end_time),
+            reason = COALESCE(?, reason),
+            type = COALESCE(?, type)
+        WHERE id = ?
+      `, [startStr, endStr, reason || null, type || 'maintenance', existing[0].id]);
+    } else {
+      await query(`
+        INSERT INTO resource_availability_exceptions (resource_id, start_time, end_time, reason, type)
+        VALUES (?, ?, ?, ?, ?)
+      `, [resourceId, startStr, endStr, reason || 'Scheduled Maintenance', type || 'maintenance']);
+    }
 
     await query(`INSERT INTO audit_logs (user_id, action, details) VALUES (?, 'BLOCK_RESOURCE', ?)`,
-      [req.user.id, JSON.stringify({ resourceId, startTime, endTime, reason })]);
+      [req.user.id, JSON.stringify({ resourceId, startTime: startStr, endTime: endStr, reason })]);
 
     req.io.emit('calendar_updated', { resourceId });
+    req.io.emit('resource_updated', { resourceId });
 
-    res.json({ message: 'Maintenance block scheduled successfully' });
+    res.json({ message: 'Maintenance block scheduled/updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Extend or Update Maintenance Block (PUT /:id/block)
+router.put('/:id/block', authenticateToken, checkRole(['super_admin', 'resource_manager', 'department_head']), async (req, res) => {
+  try {
+    const resourceId = req.params.id;
+    const authorized = await isAuthorizedForResource(req.user, resourceId);
+    if (!authorized) {
+      return res.status(403).json({ error: 'Access denied: you do not manage this resource department' });
+    }
+    const { startTime, endTime, reason, type } = req.body;
+    const startStr = formatSqlDate(startTime);
+    const endStr = formatSqlDate(endTime);
+
+    const existing = await query('SELECT id FROM resource_availability_exceptions WHERE resource_id = ? ORDER BY id DESC LIMIT 1', [resourceId]);
+    if (existing.length > 0) {
+      await query(`
+        UPDATE resource_availability_exceptions 
+        SET start_time = COALESCE(?, start_time),
+            end_time = COALESCE(?, end_time),
+            reason = COALESCE(?, reason),
+            type = COALESCE(?, type)
+        WHERE id = ?
+      `, [startStr, endStr, reason || null, type || 'maintenance', existing[0].id]);
+    } else {
+      await query(`
+        INSERT INTO resource_availability_exceptions (resource_id, start_time, end_time, reason, type)
+        VALUES (?, ?, ?, ?, ?)
+      `, [resourceId, startStr, endStr, reason || 'Scheduled Maintenance', type || 'maintenance']);
+    }
+
+    await query(`INSERT INTO audit_logs (user_id, action, details) VALUES (?, 'EXTEND_BLOCK_RESOURCE', ?)`,
+      [req.user.id, JSON.stringify({ resourceId, startTime: startStr, endTime: endStr, reason })]);
+
+    req.io.emit('calendar_updated', { resourceId });
+    req.io.emit('resource_updated', { resourceId });
+
+    res.json({ message: 'Maintenance block extended successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unblock Resource / Remove Maintenance Block (Early release)
+router.delete('/:id/block', authenticateToken, checkRole(['super_admin', 'resource_manager', 'department_head']), async (req, res) => {
+  try {
+    const resourceId = req.params.id;
+    const authorized = await isAuthorizedForResource(req.user, resourceId);
+    if (!authorized) {
+      return res.status(403).json({ error: 'Access denied: you do not manage this resource department' });
+    }
+
+    await query('DELETE FROM resource_availability_exceptions WHERE resource_id = ?', [resourceId]);
+    await query(`INSERT INTO audit_logs (user_id, action, details) VALUES (?, 'UNBLOCK_RESOURCE', ?)`,
+      [req.user.id, JSON.stringify({ resourceId })]);
+
+    req.io.emit('calendar_updated', { resourceId });
+    req.io.emit('resource_updated', { resourceId });
+
+    res.json({ message: 'Resource unblocked successfully. Status reverted to Available.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Extend or Update Maintenance Block by Block ID or Resource ID
+router.put('/blocks/:blockId', authenticateToken, checkRole(['super_admin', 'resource_manager', 'department_head']), async (req, res) => {
+  try {
+    const blockId = req.params.blockId;
+    const { startTime, endTime, reason } = req.body;
+    const startStr = formatSqlDate(startTime);
+    const endStr = formatSqlDate(endTime);
+
+    const existing = await query('SELECT id, resource_id FROM resource_availability_exceptions WHERE id = ? OR resource_id = ? LIMIT 1', [blockId, blockId]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Maintenance block not found' });
+    const target = existing[0];
+
+    const authorized = await isAuthorizedForResource(req.user, target.resource_id);
+    if (!authorized) {
+      return res.status(403).json({ error: 'Access denied: you do not manage this resource department' });
+    }
+
+    await query(`
+      UPDATE resource_availability_exceptions 
+      SET start_time = COALESCE(?, start_time),
+          end_time = COALESCE(?, end_time),
+          reason = COALESCE(?, reason)
+      WHERE id = ?
+    `, [startStr, endStr, reason || null, target.id]);
+
+    await query(`INSERT INTO audit_logs (user_id, action, details) VALUES (?, 'EXTEND_BLOCK_RESOURCE', ?)`,
+      [req.user.id, JSON.stringify({ blockId: target.id, resourceId: target.resource_id, endTime: endStr, reason })]);
+
+    req.io.emit('calendar_updated', { resourceId: target.resource_id });
+    req.io.emit('resource_updated', { resourceId: target.resource_id });
+
+    res.json({ message: 'Maintenance block extended successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

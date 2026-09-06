@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useSocket } from '../context/SocketContext';
-import { Search, Filter, MapPin, Users, CheckCircle, ShieldAlert, Clock, ArrowRight, Eye, X, Edit, Trash2, Check, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { Search, Filter, MapPin, Users, CheckCircle, CheckCircle2, ShieldAlert, Clock, ArrowRight, Eye, X, Edit, Trash2, Check, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { getResourceImage, getDefaultResourceImage, normalizeImageUrl } from '../utils/imageUtils';
 import { API_BASE_URL } from '../config';
 
@@ -199,6 +199,26 @@ export default function ResourceCatalog({ onSelectResource }) {
       });
       if (res.ok) {
         setDetailResource(null);
+        fetchResources();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUnblockResource = async (resourceId) => {
+    if (!window.confirm(lang === 'am' ? 'የጥገና እገዳውን አንስተው ሪሶርሱን ወዲያውኑ ወደ ክፍት (Available) መመለስ ይፈልጋሉ?' : 'Are you sure you want to lift the maintenance block and restore this resource to Available now?')) return;
+    try {
+      const token = sessionStorage.getItem('shered_res_token');
+      const res = await fetch(`${API_BASE_URL}/api/resources/${resourceId}/block`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'x-simulated-user-id': user?.id || '1',
+          'x-simulated-role': user?.role || 'super_admin'
+        }
+      });
+      if (res.ok) {
         fetchResources();
       }
     } catch (err) {
@@ -561,6 +581,16 @@ export default function ResourceCatalog({ onSelectResource }) {
                     <div style={{ flex: 1, textAlign: 'center', padding: '8px', background: 'var(--bg-main)', borderRadius: 'var(--radius-sm)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
                       {t('readOnlyAuditor')}
                     </div>
+                  ) : r.current_status === 'maintenance' && isAdmin ? (
+                    <button
+                      className="btn btn-secondary"
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#f0fdf4', color: '#16a34a', borderColor: '#86efac', fontWeight: 700 }}
+                      onClick={() => handleUnblockResource(r.id)}
+                      title={lang === 'am' ? 'የጥገና እገዳውን አንሳ' : 'Unblock and restore to Available'}
+                    >
+                      <CheckCircle2 size={14} />
+                      {lang === 'am' ? 'እገዳ አንሳ (Unblock)' : 'Unblock Now'}
+                    </button>
                   ) : (
                     <button
                       className={`btn ${r.current_status === 'in_use' ? 'btn-secondary' : 'btn-primary'}`}
