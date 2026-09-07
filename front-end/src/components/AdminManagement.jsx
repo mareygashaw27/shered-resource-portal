@@ -25,9 +25,14 @@ export default function AdminManagement() {
   const [type, setType] = useState('meeting_room');
   const [category, setCategory] = useState('Meeting Rooms');
   const [capacity, setCapacity] = useState(10);
+  const [location, setLocation] = useState('');
+  const [operatingHoursStart, setOperatingHoursStart] = useState('08:00');
+  const [operatingHoursEnd, setOperatingHoursEnd] = useState('18:00');
+  const [deptRestriction, setDeptRestriction] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [requiresCheckin, setRequiresCheckin] = useState(true);
+  const [creatingResource, setCreatingResource] = useState(false);
 
   // Convert and compress file to lightweight base64 data URL
   const handleImageFile = (file, setter) => {
@@ -211,6 +216,71 @@ export default function AdminManagement() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleCreateResource = async (e) => {
+    e.preventDefault();
+    setResourceMsg({ type: '', text: '' });
+    setCreatingResource(true);
+    try {
+      const token = sessionStorage.getItem('shered_res_token');
+      const res = await fetch(`${API_BASE_URL}/api/resources`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+          'x-simulated-user-id': loggedInUser?.id || user?.id || '1',
+          'x-simulated-role': loggedInUser?.role || user?.role || 'super_admin'
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          type,
+          category,
+          capacity: parseInt(capacity) || 1,
+          location: location.trim(),
+          operating_hours_start: operatingHoursStart || '08:00',
+          operating_hours_end: operatingHoursEnd || '18:00',
+          department_restriction: deptRestriction.trim() || null,
+          requires_approval: requiresApproval ? 1 : 0,
+          requires_checkin: requiresCheckin ? 1 : 0,
+          image_url: normalizeImageUrl(imageUrl) || null
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setShowAddModal(false);
+        // Reset form
+        setName('');
+        setType('meeting_room');
+        setCategory('Meeting Rooms');
+        setCapacity(10);
+        setLocation('');
+        setOperatingHoursStart('08:00');
+        setOperatingHoursEnd('18:00');
+        setDeptRestriction('');
+        setImageUrl('');
+        setRequiresApproval(true);
+        setRequiresCheckin(true);
+        fetchResources();
+        setResourceMsg({
+          type: 'success',
+          text: lang === 'am' ? '✅ አዲስ ሪሶርስ በተሳካ ሁኔታ ተፈጥሯል!' : '✅ New resource created successfully!'
+        });
+      } else {
+        setResourceMsg({
+          type: 'error',
+          text: data.error || (lang === 'am' ? 'ሪሶርስ መፍጠር አልተቻለም።' : 'Failed to create resource.')
+        });
+      }
+    } catch (err) {
+      setResourceMsg({
+        type: 'error',
+        text: lang === 'am' ? 'ሪሶርስ መፍጠር አልተቻለም።' : 'Failed to create resource.'
+      });
+    } finally {
+      setCreatingResource(false);
     }
   };
 
@@ -753,9 +823,62 @@ export default function AdminManagement() {
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>{t('capacity')}</label>
+                  <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} required style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>{t('locationHeader')}</label>
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Building A - Floor 3"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {/* Operating Hours / Time */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    {lang === 'am' ? 'የሥራ መጀመሪያ ሰዓት' : 'Operating Hours Start'}
+                  </label>
+                  <input
+                    type="time"
+                    value={operatingHoursStart}
+                    onChange={(e) => setOperatingHoursStart(e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    {lang === 'am' ? 'የሥራ ማብቂያ ሰዓት' : 'Operating Hours End'}
+                  </label>
+                  <input
+                    type="time"
+                    value={operatingHoursEnd}
+                    onChange={(e) => setOperatingHoursEnd(e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              {/* Department Restriction */}
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>{t('capacity')}</label>
-                <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} required style={{ width: '100%' }} />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                  {lang === 'am' ? 'የክፍል ገደብ (ከተፈለገ ብቻ)' : 'Department Restriction (Optional)'}
+                </label>
+                <input
+                  type="text"
+                  value={deptRestriction}
+                  onChange={(e) => setDeptRestriction(e.target.value)}
+                  placeholder="e.g. IT Department (Leave empty for public access)"
+                  style={{ width: '100%' }}
+                />
               </div>
 
               {/* Image: URL input + file picker */}
@@ -841,7 +964,9 @@ export default function AdminManagement() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>{t('cancel')}</button>
-                <button type="submit" className="btn btn-primary">{t('createResourceBtn')}</button>
+                <button type="submit" className="btn btn-primary" disabled={creatingResource}>
+                  {creatingResource ? (lang === 'am' ? 'እየፈጠረ ነው...' : 'Creating...') : t('createResourceBtn')}
+                </button>
               </div>
             </form>
           </div>
